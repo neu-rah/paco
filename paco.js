@@ -35,7 +35,7 @@ const isAlphaNum=o=>isLetter(o)||isDigit(o)
 
 //recursively extends the parser continuations (.then, .drop, .or, ...)
 const parserOf=o=>(
-  o.then=p=>parserOf(io=>log("then io:",io).mbind(o).mbind(p))//o.then(p) <=> \io-> io >>= o >>= p
+  o.then=p=>parserOf(io=>io.mbind(o).mbind(p))//o.then(p) <=> \io-> io >>= o >>= p
   ,o.drop=p=>parserOf(io=>{
     const os=io.mbind(o)
     return os.mbind(p).map(map(o=>snd(fromRight(os)))).when(os)
@@ -95,6 +95,6 @@ const parse=p=>str=>p(Pair(str,[]))
 
 // clog(digit.then(digit.then(digit).as(o=>o.join("")*10))(Pair("123",[])))
 
-clog(many(digit).join()(Pair("x123",[])))
+clog(many(digit).join()(Pair("123x",[])))
 
 var io=Pair("123",[])
