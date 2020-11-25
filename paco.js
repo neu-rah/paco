@@ -73,27 +73,27 @@ const parse=p=>str=>p(Pair(str,[]))
 
 //using the parser continuation syntax
 // `.then` `.drop` `.or`
-// console.log(
-//   digit
-//     .drop(digit)
-//     .then(digit)//chain or parsers
-//     .as(mconcat)//same a .join()
-//     (Pair("123",[]))//initial state
-//     // .map(map(o=>[o.join("")]))//format output
-// )
+console.log(
+  digit
+    .drop(digit)
+    .then(digit)//chain or parsers
+    .as(mconcat)//same a .join()
+    (Pair("123",[]))//initial state
+    // .map(map(o=>[o.join("")]))//format output
+)
 
-// console.log(
-//   drop(digit)
-//     .then(digit)
-//     .then(digit)
-//     .join("|")
-//     (Pair("123",[]))
-//     // .map(map(o=>[o.join("")]))
-// )
+console.log(
+  drop(digit)
+    .then(digit)
+    .then(digit)
+    .join("|")
+    (Pair("123",[]))
+    // .map(map(o=>[o.join("")]))
+)
 
-// clog(letter.or(digit)(Pair("0a12",[])))
+clog(letter.or(digit)(Pair("0a12",[])))
 
-// clog(digit.then(digit.then(digit).as(o=>o.join("")*10))(Pair("123",[])))
+clog(digit.then(digit.then(digit).join().as(o=>o*10))(Pair("123",[])))
 
 clog(many(digit).join()(Pair("123x",[])))
 
