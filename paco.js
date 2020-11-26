@@ -32,7 +32,8 @@ const {
 
 //recursively extends the parser continuations (.then, .skip, .or, ...)
 const parserOf=o=>(
-  o.then=p=>parserOf(io=>io.mbind(o).mbind(p))//o.then(p) <=> \io-> io >>= o >>= p
+  o.parse=s=>o(Pair(s,[]))
+  ,o.then=p=>parserOf(io=>io.mbind(o).mbind(p))//o.then(p) <=> \io-> io >>= o >>= p
   ,o.skip=p=>parserOf(io=>{
     const os=io.mbind(o)
     return os.mbind(p).map(map(o=>snd(fromRight(os)))).when(os)
@@ -40,7 +41,8 @@ const parserOf=o=>(
   ,o.or=p=>parserOf(io=>o(io).or(p(io)))//using alternative <|>
   ,o.as=f=>parserOf(io=>Pair(io.fst(),[]).mbind(o).map(map(f)).map(map(x=>io.snd().append(x))))
   ,o.join=p=>typeof p=="undefined"?o.as(mconcat):o.as(o=>o.join(p))
-  ,o)
+  ,o
+)
 
 // Combinators --------------
 //and id parse combinator to apply continuations on root elements
@@ -81,6 +83,7 @@ const spaces=many(space)
 const blanks=many(blank)
 const spaces1=many1(space)
 const blanks1=many1(blank)
+const digits=many(digit)
 
 const parse=p=>str=>{
   const r=p(Pair(str,[]))
@@ -107,6 +110,7 @@ exports.spaces=spaces
 exports.blanks=blanks
 exports.spaces1=spaces1
 exports.blanks1=blanks1
+exports.digits=digits
 exports.eof=eof
 
 exports.boot=boot
@@ -114,3 +118,4 @@ exports.skip=skip
 exports.many=many
 exports.many1=many1
 exports.parse=parse
+
