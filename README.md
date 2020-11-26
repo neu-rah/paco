@@ -73,7 +73,7 @@ Same with
 ```javascript
 digits.parse("123")
 ```
-the only difference is that this last one, as the first will give full output, inclusing input state
+the only difference is that this last one, as the first will give full output, including the input state.
 
 ```javascript
 #> TC_Right { value: TC_Pair { a: '', b: [ '1', '2', '3' ] } }

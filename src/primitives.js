@@ -4,8 +4,8 @@ const chkOf=m=>p=>(p.expect=m,p)
 
 //parser primitves
 const isChar=c=>chkOf("character `"+c+"`")(o=>c==o)
-const isOneOf=cs=>chkOf("one if `"+cs+"`")(o=>cs.indexOf(o)>-1)
-const isNoneOf=cs=>chkOf("none if `"+cs+"`")(o=>cs.indexOf(o)==-1)
+const isOneOf=cs=>chkOf("one of `"+cs+"`")(o=>cs.indexOf(o)>-1)
+const isNoneOf=cs=>chkOf("none of `"+cs+"`")(o=>cs.indexOf(o)==-1)
 const inRange=(a,z)=>chkOf("character in range from `"+a+"` to `"+z+"´")(o=>a<=o&&o<=z)
 
 const isDigit=chkOf("digit")(inRange('0','9'))
