@@ -23,13 +23,13 @@ The chaining is done with `.then` or `.skip`, the first combines the output, whi
 
 Parsers can alternate with `.or`
 
-Parse output can be formated with `.as`, it will apply to the parser or group where inserted. `.as` wil accept an output transformer function.
+Parse output can be formated with `.as`, it will apply to the parser or group where inserted. `.as` will accept an output transformer function.
 
 Output transformations can stack up.
 
-`.join()` or `.join(«sep»)` are shortcuts for `.as(mappend)` and `.as(o=>o.join(«sep»))`
+`.join()` and `.join(«sep»)` are shortcuts for `.as(mappend)` and `.as(o=>o.join(«sep»))`
 
-Parsers can group by nesting ex: `x.then(y.then(z).join(""))`, here the join will only apply to the (y.z) results.
+Parsers can group by nesting ex: `x.then( y.then(z).join("") )`, here the join will only apply to the (y.z) results.
 
 For now parsers accept a state pair of (input,output) and will return `Either` an error string or a resulting state pair.
 
@@ -119,7 +119,7 @@ expected result
 
 - **oneOf("...")** matches any given string character
 
-- **noneOf("...")** matches charcated not included in string
+- **noneOf("...")** matches any character not included in string
 
 - **range(a,z)** matches characters between the given ones (inclusive)
 
@@ -159,13 +159,17 @@ expected result
 
 - **eof** end of file
 
-- **boot** non-consume happy parser
+- **skip(...)** ignore the group/parser output
 
-- **skip** ignore the group/parser output
+- **many(p)** optional many ocourences or parser `p` targets
 
-- **many(p)** optional many ocourences or parser `p`
+- **many1(p)** one or more ocourences of parser `p` targets
 
-- **many1(p)** one or more ocourences of parser `p`
+- **boot()** non-consume happy parser
+
+> boot is an identity parser, will just output the given input as a successful parse. So it never fails or consumes.  
+We use it to turn binary combinators into unary metaparsers. That is the case of `.skip(...)`, it uses the `boot()` parser to be available as a unary modifier `skip()`.  
+`boot()` can do so for any bynary combinator.
 
 ## utility
 
