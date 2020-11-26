@@ -2,6 +2,21 @@
 
 **javascript monadic parser combinators**
 
+```javascript
+const p=
+  skip(char('#'))
+  .then(many(letter).join(""))
+  .skip(char('-'))
+  .then(digits.join("").as(o=>o*1))
+
+parse(p)("#AN-123")
+```
+
+outputs:
+```javascript
+TC_Right { value: [ 'AN', 123 ] }
+```
+
 All parsers can chain up or group to form other parsers.
 
 The chaining is done with `.then` or `.skip`, the first combines the output, while the second will drop it.
@@ -24,6 +39,13 @@ Some available metaparsers like `many()`, `many1`, `skip()` can accept other par
 
 Some parsers are already a composition with metaparses, that the case of `digits`, it will perform `many(digit)`.
 
+`.parse("...")` can be used to quick feed a string to any parser.
+The result will include both input and output state.
+
+_use `parse` function to get only output_
+
+all transformation definitions should be applyed to the parser and not to the result, so `.parse` should be the last item of the group.
+
 ## Examples
 
 testing a simple parser
@@ -44,14 +66,16 @@ a parser can be stored, passed around and perform parsing on many contents many 
 
 ```javascript
 const nr=
-  digits.join("").as(o=>o*1)//get first digits as number
+  skip(spaces)
+  .then(digits).join("").as(o=>o*1)//get first digits as number
   .then(many(//then seek many separated by `,`
-    skip(char(','))//drop the separator (not included in output)
+    skip(spaces)
+    .skip(char(',').or(char('|')))//drop the separator (not included in output)
+    .skip(spaces)
     .then(digits.join("").as(o=>o*1))
   )).as(foldr1(a=>b=>a+b))//transform output by summing all values
 
-parse(nr)("123,25,3")
-
+  parse(nr)(" 123 , 25 | 3")
 ```
 
 expected result
