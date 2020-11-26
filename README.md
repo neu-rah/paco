@@ -169,7 +169,7 @@ expected result
 
 > boot is an identity parser, will just output the given input as a successful parse. So it never fails or consumes.  
 We use it to turn binary combinators into unary metaparsers. That is the case of `.skip(...)`, it uses the `boot()` parser to be available as a unary modifier `skip()`.  
-`boot()` can do so for any bynary combinator.
+`boot()` can do so for any binary combinator.
 
 ## utility
 
