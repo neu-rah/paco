@@ -51,18 +51,46 @@ all transformation definitions should be applyed to the parser and not to the re
 testing a simple parser
 
 ```javascript
-digits(Pair("123",[]))
+digits(Pair("123",[]))/
 ```
-
+outputs:
+```javascript
+#> TC_Right { value: TC_Pair { a: '', b: [ '1', '2', '3' ] } }
+```
 This is the basic for of parsing (feeding a parser). However a `parse` function is available:
 
 ```javascript
-parse(digit)("123")
+parse(digits)("123")
+```
+it will performe as the former. But will output
+
+```javascript
+#> TC_Right { value: [ '1', '2', '3' ] }
 ```
 
-it will performe as the former.
+Same with
 
-a parser can be stored, passed around and perform parsing on many contents many times, all transitory state is keep outside.
+```javascript
+digits.parse("123")
+```
+the only difference is that this last one, as the first will give full output, inclusing input state
+
+```javascript
+#> TC_Right { value: TC_Pair { a: '', b: [ '1', '2', '3' ] } }
+```
+
+### failing
+
+this parse will fail as it expects at least one digit
+
+```javascript
+many1(digit).parse("#123")
+```
+result:
+```javascript
+#> TC_Left { value: 'digit' }
+```
+a parser can be stored, combined, passed around and perform parsing on many contents many times, all transitory state is keep outside.
 
 ```javascript
 const nr=
@@ -80,7 +108,7 @@ const nr=
 
 expected result
 ```javascript
-TC_Right { value: [ 151 ] }
+#> TC_Right { value: [ 151 ] }
 ```
 
 ## Parsers
@@ -137,7 +165,7 @@ TC_Right { value: [ 151 ] }
 
 - **many(p)** optional many ocourences or parser `p`
 
-- **many1** one or more ocourences of parser `p`
+- **many1(p)** one or more ocourences of parser `p`
 
 ## utility
 
