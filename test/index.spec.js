@@ -22,8 +22,10 @@ patchPrimitives(
 )
 
 const {
-  boot,skip,satisfy,char,range,many,many1,parse,
-  digit,lowerCase,upperCase,letter,alphaNum,
+  char,oneOf,noneOf,range,many,many1,parse,
+  satisfy,boot,skip,
+  digit,lower,upper,letter,alphaNum,hexDigit,octDigit,
+  space,tab,nl,cr,blank,eof,  
 }=require("../paco.js")
 
 ///////////////////////////////////////////
@@ -53,13 +55,13 @@ describe("Character parsers",function() {
     assert.deepStrictEqual(parse(digit)("1"),Right(["1"]),"digit")
     assert(isLeft(parse(digit)("a")),"digit fail")
   })
-  it("lowerCase",async ()=>{
-    assert.deepStrictEqual(parse(lowerCase)("a"),Right(["a"]),"lowerCase")
-    assert(isLeft(parse(lowerCase)("A")),"lowerCase fail")
+  it("lower",async ()=>{
+    assert.deepStrictEqual(parse(lower)("a"),Right(["a"]),"lower")
+    assert(isLeft(parse(lower)("A")),"lower fail")
   })
-  it("upperCase",async ()=>{
-    assert.deepStrictEqual(parse(upperCase)("Z"),Right(["Z"]),"upperCase")
-    assert(isLeft(parse(upperCase)("z")),"upperCase fail")
+  it("upper",async ()=>{
+    assert.deepStrictEqual(parse(upper)("Z"),Right(["Z"]),"upper")
+    assert(isLeft(parse(upper)("z")),"upper fail")
   })
   it("letter",async ()=>{
     assert.deepStrictEqual(parse(letter)("x"),Right(["x"]),"letter")

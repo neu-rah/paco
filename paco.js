@@ -25,8 +25,9 @@ patchPrimitives(
 // Parser
 
 const {
-  isChar,inRange,
-  isDigit,isLowerCase,isUpperCase,isLetter,isAlphaNum,
+  isChar,isOneOf,isNoneOf,inRange,
+  isDigit,isLower,isUpper,isLetter,isAlphaNum,isHexDigit,isOctDigit,
+  isSpace,isTab,is_nl,is_cr,isBlank,isEof
 }=require("./src/primitives")
 
 //recursively extends the parser continuations (.then, .skip, .or, ...)
@@ -56,60 +57,60 @@ const satisfy=chk=>parserOf(io=>
     :Left(chk.expect))
 
 const char=c=>satisfy(isChar(c))
+const oneOf=cs=>satisfy(isOneOf(cs))
+const noneOf=cs=>satisfy(isNoneOf(cs))
 const range=(a,z)=>c=>satisfy(inRange(a,z))(c)
 const digit=satisfy(isDigit)
-const lowerCase=satisfy(isLowerCase)
-const upperCase=satisfy(isUpperCase)
+const lower=satisfy(isLower)
+const upper=satisfy(isUpper)
 const letter=satisfy(isLetter)
 const alphaNum=satisfy(isAlphaNum)
+const hexDigit=satisfy(isHexDigit)
+const octDigit=satisfy(isOctDigit)
+const space=satisfy(isSpace)
+const tab=satisfy(isTab)
+const nl=satisfy(is_nl)
+const cr=satisfy(is_cr)
+const blank=satisfy(isBlank)
+const eof=satisfy(isEof)
 
 const many=p=>parserOf(io=>p.then(many(p))(io).or(Right(io)))
 const many1=p=>parserOf(p.then(many(p)))
+
+const spaces=many(space)
+const blanks=many(blank)
+const spaces1=many1(space)
+const blanks1=many1(blank)
 
 const parse=p=>str=>{
   const r=p(Pair(str,[]))
   return r.then(r.map(snd))}
 
-// testing --------------------------------------------------------------
-
-//using the parser continuation syntax
-// `.then` `.skip` `.or`
-// console.log(
-//   digit
-//     .skip(digit)
-//     .then(digit)//chain or parsers
-//     .as(mconcat)//same a .join()
-//     (Pair("123",[]))//initial state
-//     // .map(map(o=>[o.join("")]))//format output
-// )
-
-// console.log(
-//   skip(digit)
-//     .then(digit)
-//     .then(digit)
-//     .join("|")
-//     (Pair("123",[]))
-//     // .map(map(o=>[o.join("")]))
-// )
-
-// clog(many(letter.or(digit)).join()(Pair("0x12Some test",[])))
-
-// clog(digit.then(digit.then(digit).join().as(o=>o*10))(Pair("123",[])))
-
-// clog(many(digit).join()(Pair("123x",[])))
-
-// var io=Pair("123",[])
+exports.satisfy=satisfy
+exports.char=char
+exports.oneOf=oneOf
+exports.noneOf=noneOf
+exports.range=range
+exports.digit=digit
+exports.lower=lower
+exports.upper=upper
+exports.letter=letter
+exports.alphaNum=alphaNum
+exports.hexDigit=hexDigit
+exports.octDigit=octDigit
+exports.space=space
+exports.tab=tab
+exports.nl=nl
+exports.cr=cr
+exports.blank=blank
+exports.spaces=spaces
+exports.blanks=blanks
+exports.spaces1=spaces1
+exports.blanks1=blanks1
+exports.eof=eof
 
 exports.boot=boot
 exports.skip=skip
-exports.satisfy=satisfy
-exports.char=char
-exports.range=range
-exports.digit=digit
-exports.lowerCase=lowerCase
-exports.upperCase=upperCase
-exports.letter=letter
-exports.alphaNum=alphaNum
 exports.many=many
 exports.many1=many1
 exports.parse=parse
