@@ -40,7 +40,8 @@ const parserOf=e=>o=>{
     const os=io.mbind(o)
     return os.mbind(p).map(map(o=>snd(fromRight(os)))).when(os)
   })
-  o.or=p=>parserOf(o.expect+" or "+p.expect)(io=>o(io).or(p(io)).or(Left(Pair(io.fst(),o.or(p).expect))))//using alternative <|>
+  o.failsWith=msg=>parserOf(msg)(io=>o(io).or(Left(Pair(io.fst(),msg))))
+  o.or=p=>parserOf(o.expect+" or "+p.expect)(io=>o(io).or(p(io)))//.or(Left(Pair(io.fst(),o.or(p).expect))))//using alternative <|>
   o.as=f=>parserOf(o.expect+" transform")(io=>Pair(io.fst(),[]).mbind(o).map(map(f)).map(map(x=>io.snd().append(x))))
   o.join=p=>typeof p=="undefined"?o.as(mconcat):o.as(o=>o.join(p))
   o.expect=e
