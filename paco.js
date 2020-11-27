@@ -41,7 +41,7 @@ const parserOf=e=>o=>{
     return os.mbind(p).map(map(o=>snd(fromRight(os)))).when(os)
   })
   o.failsWith=msg=>parserOf(msg)(io=>o(io).or(Left(Pair(io.fst(),msg))))
-  o.or=p=>parserOf(o.expect+" or "+p.expect)(io=>o(io).or(p(io)))//.or(Left(Pair(io.fst(),o.or(p).expect))))//using alternative <|>
+  o.or=p=>parserOf(o.expect+" or "+p.expect)(io=>o(io).or(p(io)).or(Left(Pair(io.fst(),o.or(p).expect))))//using alternative <|>
   o.as=f=>parserOf(o.expect+" transform")(io=>Pair(io.fst(),[]).mbind(o).map(map(f)).map(map(x=>io.snd().append(x))))
   o.join=p=>typeof p=="undefined"?o.as(mconcat):o.as(o=>o.join(p))
   o.expect=e
@@ -91,6 +91,7 @@ const blank=satisfy(isBlank)
 const eof=satisfy(isEof)
 
 const optional=p=>parserOf("optional ",p.expect)(io=>p(io).or(Right(io)))
+const choice=ps=>foldr1(a=>b=>a.or(b))(ps)
 
 const many=p=>parserOf("many ",p.expect)(io=>p.then(many(p))(io).or(Right(io)))
 const many1=p=>parserOf("at least one "+p.expect)(p.then(many(p)))
@@ -142,4 +143,5 @@ exports.skip=skip
 exports.many=many
 exports.many1=many1
 exports.optional=optional
+exports.choice=choice
 exports.parse=parse
