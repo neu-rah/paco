@@ -54,14 +54,15 @@ const boot=()=>parserOf("")(fcomp(Right)(id))
 
 const skip=o=>boot().skip(o)//apply skip (continuation) to the root element, using `boot` combinator
 
-const satisfy=chk=>parserOf(chk.expect||"to satisfy condition")(io=>
-  chk(head(io.fst()))?
+const satisfy=chk=>parserOf(chk.expect||"to satisfy condition")(io=>{
+  // clog("satisfy",chk.expect)
+  return chk(head(io.fst()))?
     Right(//success...
       Pair(//build a pair of remaining input and composed output
         tail(io.fst()),//consume input
         io.snd().append([head(io.fst())])))//compose the outputs
     :Left( Pair(io.fst(),chk.expect||satisfy(chk).expect))
-)
+})
 
 const string=str=>parserOf("string `"+str+"`")(
   function(io){
@@ -91,7 +92,7 @@ const blank=satisfy(isBlank)
 const eof=satisfy(isEof)
 
 const optional=p=>parserOf("optional ",p.expect)(io=>p(io).or(Right(io)))
-const choice=ps=>foldr1(a=>b=>a.or(b))(ps)
+const choice=ps=>foldl1(a=>b=>a.or(b))(ps)
 
 const many=p=>parserOf("many ",p.expect)(io=>p.then(many(p))(io).or(Right(io)))
 const many1=p=>parserOf("at least one "+p.expect)(p.then(many(p)))
