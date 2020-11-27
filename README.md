@@ -57,12 +57,12 @@ outputs:
 ```javascript
 #> TC_Right { value: TC_Pair { a: '', b: [ '1', '2', '3' ] } }
 ```
-This is the basic for of parsing (feeding a parser). However a `parse` function is available:
+This is the basic form of parsing (feeding a parser). However a `parse` function is available:
 
 ```javascript
 parse(digits)("123")
 ```
-it will performe as the former. But will output
+it will perform as the former. But will output
 
 ```javascript
 #> TC_Right { value: [ '1', '2', '3' ] }

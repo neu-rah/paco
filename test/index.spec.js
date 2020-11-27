@@ -25,7 +25,7 @@ const {
   char,oneOf,noneOf,range,many,many1,parse,
   satisfy,boot,skip,
   digit,lower,upper,letter,alphaNum,hexDigit,octDigit,
-  space,tab,nl,cr,blank,eof,  
+  space,tab,nl,cr,blank,eof,string
 }=require("../paco.js")
 
 ///////////////////////////////////////////
@@ -38,7 +38,7 @@ describe("Parser",function() {
     assert(isLeft(parse(char('x'))("")),"eof fail")
   })
 })
-describe("Character parsers",function() {
+describe("String parser",function() {
   it("satisfy",async ()=>{
     assert.deepStrictEqual(parse(satisfy(_=>true))("."),Right(["."]),"satisfy")
     assert(isLeft(parse(satisfy(_=>false))("a")),"satisfy fail")
@@ -71,6 +71,12 @@ describe("Character parsers",function() {
     assert.deepStrictEqual(parse(alphaNum)("1"),Right(["1"]),"alphaNum")
     assert.deepStrictEqual(parse(alphaNum)("N"),Right(["N"]),"alphaNum")
     assert(isLeft(parse(alphaNum)("#")),"alphaNum fail")
+  })
+})
+describe("string",function() {
+  it("string",async ()=>{
+    assert.deepStrictEqual(parse(string("ok"))("oks"),Right(["ok"]))
+    assert(isLeft(parse(string("ok"))("onks")))
   })
 })
 describe("bindings",function() {
