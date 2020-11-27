@@ -4,7 +4,7 @@
   "description": "Monadic Parser Combinators",
   "main": "paco.js",
   "scripts": {
-    "test": "mocha test/index.spec.js"
+    "test": "nyc mocha test/index.spec.js"
   },
   "author": "neu-rah",
   "license": "MIT",

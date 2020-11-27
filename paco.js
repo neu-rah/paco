@@ -30,41 +30,46 @@ const {
   isSpace,isTab,is_nl,is_cr,isBlank,isEof
 }=require("./src/primitives")
 
+const prim=require("./src/primitives")
+
 //recursively extends the parser continuations (.then, .skip, .or, ...)
-const parserOf=e=>o=>(
+const parserOf=e=>o=>{
   o.parse=s=>o(Pair(s,[]))
-  ,o.then=p=>parserOf(o.expect+".then "+p.expect)(io=>io.mbind(o).mbind(p))//o.then(p) <=> \io-> io >>= o >>= p
-  ,o.skip=p=>parserOf(o.expect+".skip "+p.expect)(io=>{
+  o.then=p=>parserOf(o.expect+" then "+p.expect)(io=>io.mbind(o).mbind(p))
+  o.skip=p=>parserOf(o.expect+" skip "+p.expect)(io=>{
     const os=io.mbind(o)
     return os.mbind(p).map(map(o=>snd(fromRight(os)))).when(os)
   })
-  ,o.or=p=>parserOf(o.expect+" or "+p.expect)(io=>o(io).or(p(io)))//using alternative <|>
-  ,o.as=f=>parserOf(o.expect+" transform")(io=>Pair(io.fst(),[]).mbind(o).map(map(f)).map(map(x=>io.snd().append(x))))
-  ,o.join=p=>typeof p=="undefined"?o.as(mconcat):o.as(o=>o.join(p))
-  ,o.expect=e
-  ,o
-)
+  o.or=p=>parserOf(o.expect+" or "+p.expect)(io=>o(io).or(p(io)).or(Left(Pair(io.fst(),o.or(p).expect))))//using alternative <|>
+  o.as=f=>parserOf(o.expect+" transform")(io=>Pair(io.fst(),[]).mbind(o).map(map(f)).map(map(x=>io.snd().append(x))))
+  o.join=p=>typeof p=="undefined"?o.as(mconcat):o.as(o=>o.join(p))
+  o.expect=e
+  return (self=>o)(o)
+}
 
 // Combinators --------------
 //and id parse combinator to apply continuations on root elements
-const boot=()=>parserOf("boot")(fcomp(Right)(id))
+const boot=()=>parserOf("")(fcomp(Right)(id))
 
 const skip=o=>boot().skip(o)//apply skip (continuation) to the root element, using `boot` combinator
 
-const satisfy=chk=>parserOf("satisfy")(io=>
+const satisfy=chk=>parserOf(chk.expect||"to satisfy condition")(io=>
   chk(head(io.fst()))?
     Right(//success...
       Pair(//build a pair of remaining input and composed output
         tail(io.fst()),//consume input
         io.snd().append([head(io.fst())])))//compose the outputs
-    :Left(chk.expect))
+    :Left( Pair(io.fst(),chk.expect||satisfy(chk).expect))
+)
 
-const string=str=>parserOf("string `"+str+"`")(var _string=function(io){
-  clog(io)
-  if(io.fst().startsWith(str))
-    return Right(Pair(io.fst().substr(str.length),io.snd().append(str)))
-  return Left(this.expect)
-})
+const string=str=>parserOf("string `"+str+"`")(
+  function(io){
+    // clog(io,this)
+    if(io.fst().startsWith(str))
+      return Right(Pair(io.fst().substr(str.length),io.snd().append(str)))
+    return Left(io.map(_=>str))
+  }
+)
 
 const char=c=>satisfy(isChar(c))
 const oneOf=cs=>satisfy(isOneOf(cs))
@@ -84,8 +89,8 @@ const cr=satisfy(is_cr)
 const blank=satisfy(isBlank)
 const eof=satisfy(isEof)
 
-const many=p=>parserOf("many")(io=>p.then(many(p))(io).or(Right(io)))
-const many1=p=>parserOf("many1")(p.then(many(p)))
+const many=p=>parserOf("many ",p.expect)(io=>p.then(many(p))(io).or(Right(io)))
+const many1=p=>parserOf("at least one "+p.expect)(p.then(many(p)))
 
 const spaces=many(space)
 const blanks=many(blank)
@@ -95,7 +100,14 @@ const digits=many(digit)
 
 const parse=p=>str=>{
   const r=p(Pair(str,[]))
-  return r.then(r.map(snd))}
+  return isRight(r)?
+    r.map(snd):
+    Left(
+      "error, expecting "+fromLeft(r).snd()
+      +" but found `"+head(fromLeft(r).fst())
+      +"` here->"+fromLeft(r).fst().substr(0,10)
+    )
+}
 
 exports.satisfy=satisfy
 exports.char=char
@@ -127,4 +139,3 @@ exports.skip=skip
 exports.many=many
 exports.many1=many1
 exports.parse=parse
-

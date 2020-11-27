@@ -125,7 +125,7 @@ describe("Metaparsers",function() {
     )
     assert.deepStrictEqual(
       parse(many(digit).join())(""),
-      Right([undefined]),"repeat a parser option"
+      Right([]),"repeat a parser option"
     )
     assert.deepStrictEqual(
       parse(many1(digit).join())("123"),

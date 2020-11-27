@@ -51,7 +51,7 @@ all transformation definitions should be applyed to the parser and not to the re
 testing a simple parser
 
 ```javascript
-digits(Pair("123",[]))/
+digits(Pair("123",[]))
 ```
 outputs:
 ```javascript
