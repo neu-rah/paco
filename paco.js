@@ -90,6 +90,8 @@ const cr=satisfy(is_cr)
 const blank=satisfy(isBlank)
 const eof=satisfy(isEof)
 
+const optional=p=>parserOf("optional ",p.expect)(io=>p(io).or(Right(io)))
+
 const many=p=>parserOf("many ",p.expect)(io=>p.then(many(p))(io).or(Right(io)))
 const many1=p=>parserOf("at least one "+p.expect)(p.then(many(p)))
 
@@ -139,4 +141,5 @@ exports.boot=boot
 exports.skip=skip
 exports.many=many
 exports.many1=many1
+exports.optional=optional
 exports.parse=parse
