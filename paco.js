@@ -41,7 +41,8 @@ const parserOf=e=>o=>{
     return os.mbind(p).map(map(o=>snd(fromRight(os)))).when(os)
   })
   o.failsWith=msg=>parserOf(msg)(io=>o(io).or(Left(Pair(io.fst(),msg))))
-  o.or=p=>parserOf(o.expect+" or "+p.expect)(io=>o(io).or(p(io)).or(Left(Pair(io.fst(),o.or(p).expect))))//using alternative <|>
+  o.or=p=>parserOf(o.expect+" or "+p.expect)
+    (io=>o(io).or(p(io)).or(Left(Pair(io.fst(),o.or(p).expect))))//using alternative <|>
   o.as=f=>parserOf(o.expect+" transform")(io=>Pair(io.fst(),[]).mbind(o).map(map(f)).map(map(x=>io.snd().append(x))))
   o.join=p=>typeof p=="undefined"?o.as(mconcat):o.as(o=>o.join(p))
   o.expect=e
@@ -110,7 +111,7 @@ const parse=p=>str=>{
     Left(
       "error, expecting "+fromLeft(r).snd()
       +" but found `"+head(fromLeft(r).fst())
-      +"` here->"+fromLeft(r).fst().substr(0,10)
+      +"` here->"+fromLeft(r).fst().substr(0,10)+"..."
     )
 }
 
@@ -146,3 +147,4 @@ exports.many1=many1
 exports.optional=optional
 exports.choice=choice
 exports.parse=parse
+

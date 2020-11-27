@@ -31,13 +31,15 @@ Output transformations can stack up.
 
 Parsers can group by nesting ex: `x.then( y.then(z).join("") )`, here the join will only apply to the (y.z) results.
 
-For now parsers accept a state pair of (input,output) and will return `Either` an error string or a resulting state pair.
+For now parsers accept a state pair of (input,output) and will return `Either` a pair of input state and an error string or a pair od input state and parsed content.
 
-_* expect changes on this arguments_
+_*expect changes on this arguments format_
 
 Some available metaparsers like `many()`, `many1`, `skip()` can accept other parsers or metaparsers.
 
 Some parsers are already a composition with metaparses, that the case of `digits`, it will perform `many(digit)`.
+
+`.failsWith(msg)` provides a message for failing parser
 
 `.parse("...")` can be used to quick feed a string to any parser.
 The result will include both input and output state.
@@ -46,51 +48,60 @@ _use `parse` function to get only output_
 
 all transformation definitions should be applyed to the parser and not to the result, so `.parse` should be the last item of the group.
 
+a parser can be stored, combined, passed around and perform parsing on many contents many times, all transitory state is kept outside.
+
+### Still missing
+
+**Lazyness** right now the alternative parsers will ALL try to parse due to the strict nature of javascript.
+
 ## Examples
 
 testing a simple parser
 
 ```javascript
-digits(Pair("123",[]))
-```
-outputs:
-```javascript
-#> TC_Right { value: TC_Pair { a: '', b: [ '1', '2', '3' ] } }
+#>digits(Pair("123",[]))
+TC_Right { value: TC_Pair { a: '', b: [ '1', '2', '3' ] } }
 ```
 This is the basic form of parsing (feeding a parser). However a `parse` function is available:
 
-```javascript
-parse(digits)("123")
-```
-it will perform as the former. But will output
+it will perform as the former but with only output state
 
 ```javascript
-#> TC_Right { value: [ '1', '2', '3' ] }
+#>parse(digits)("123")
+TC_Right { value: [ '1', '2', '3' ] }
 ```
-
 Same with
 
 ```javascript
-digits.parse("123")
+#>digits.parse("123")
+TC_Right { value: TC_Pair { a: '', b: [ '1', '2', '3' ] } }
 ```
+
 the only difference is that this last one, as the first will give full output, including the input state.
 
-```javascript
-#> TC_Right { value: TC_Pair { a: '', b: [ '1', '2', '3' ] } }
-```
-
-### failing
+### -- failing --
 
 this parse will fail as it expects at least one digit
 
 ```javascript
-many1(digit).parse("#123")
+#>parse(many1(digit))("#123")
+TC_Left { value: 'error, expecting digit but found `#` here->#123' }
 ```
-result:
+## Composition examples
+
 ```javascript
-#> TC_Left { value: 'digit' }
+  parse( 
+    many(
+      many1(digit.or(letter)).join()
+      .skip(spaces)
+    ).join("-")
+  )("As armas e os baroes")
 ```
-a parser can be stored, combined, passed around and perform parsing on many contents many times, all transitory state is keep outside.
+
+expected result
+```javascript
+TC_Right { value: [ 'As-armas-e-os-baroes' ] }
+```
 
 ```javascript
 const nr=
@@ -108,7 +119,7 @@ const nr=
 
 expected result
 ```javascript
-#> TC_Right { value: [ 151 ] }
+TC_Right { value: [ 151 ] }
 ```
 
 ## Parsers
@@ -125,11 +136,11 @@ expected result
 
 - **digit** any digit `0-9`
 
-- **lower** lower case letters
+- **lower** lower case letters `a-z`
 
-- **upper** upper case letters
+- **upper** upper case letters `A-Z`
 
-- **letter** any letter
+- **letter** any letter `a-z` or `A-Z`
 
 - **alphaNum** letter or digit
 
@@ -159,19 +170,58 @@ expected result
 
 - **eof** end of file
 
+- **string("...")** match with given string
+
 - **skip(...)** ignore the group/parser output
 
-- **many(p)** optional many ocourences or parser `p` targets
+- **many(p)** optional many ocourences or parser `p` targets. This parser never fails as it can return an empty list.
 
 - **many1(p)** one or more ocourences of parser `p` targets
 
-- **boot()** non-consume happy parser
+- **optional(p)** parse `p` if present, otherwise ignore and continue parsing
+
+- **choice\[ps]** parse from a list of alternative parsers, this is just an abbreviation of `.or` sequence.
+
+- **boot()** non-consume happy parser.
 
 > boot is an identity parser, will just output the given input as a successful parse. So it never fails or consumes.  
 We use it to turn binary combinators into unary metaparsers. That is the case of `.skip(...)`, it uses the `boot()` parser to be available as a unary modifier `skip()`.  
-`boot()` can do so for any binary combinator.
+`boot()` can do so for any binary combinator.  
+
+```haskell
+Right . id
+```
 
 ## utility
 
 - **parse** `parse(parser)(input string)`
 
+```javascript
+#>parse(letter.or(digit))("1")
+TC_Right { value: [ '1' ] }
+#>parse(letter.or(digit))("a")
+TC_Right { value: [ 'a' ] }
+#>parse(letter.or(digit))("#123")
+TC_Left {
+  value: 'error, expecting letter or digit but found `#` here->#123' }
+```
+
+direct parse
+```javascript
+#>letter.or(digit).parse("1")
+TC_Right { value: TC_Pair { a: '', b: [ '1' ] } }
+#>letter.or(digit).parse("a")
+TC_Right { value: TC_Pair { a: '', b: [ 'a' ] } }
+#>letter.or(digit).parse("#123")
+TC_Left { value: TC_Pair { a: '#123', b: 'letter or digit' } }
+```
+
+desugared parse
+```javascript
+#>letter.or(digit)(Pair("1",[]))
+TC_Right { value: TC_Pair { a: '', b: [ '1' ] } }
+#>letter.or(digit)(Pair("a",[]))
+TC_Right { value: TC_Pair { a: '', b: [ 'a' ] } }
+#>letter.or(digit)(Pair("#123",[]))
+TC_Left { value: TC_Pair { a: '#123', b: 'letter or digit' } }
+```
