@@ -35,9 +35,9 @@ For now parsers accept a state pair of (input,output) and will return `Either` a
 
 _*expect changes on this arguments format_
 
-Some available metaparsers like `many()`, `many1`, `skip()` can accept other parsers or metaparsers.
+Some available metaparsers like `many()`, `many1()`, `skip()` can accept other parsers or metaparsers.
 
-Some parsers are already a composition with metaparses, that the case of `digits`, it will perform `many(digit)`.
+Some parsers are already a composition with metaparsers, that is the case of `digits`, it will perform `many(digit)`.
 
 `.failsWith(msg)` provides a message for failing parser
 
@@ -52,7 +52,8 @@ a parser can be stored, combined, passed around and perform parsing on many cont
 
 ### Still missing
 
-**Lazyness** right now the alternative parsers will ALL try to parse due to the strict nature of javascript.
+~~**Lazyness** right now the alternative parsers will ALL try to parse due to the strict nature of javascript.~~
+inserted a stricty check between the alternative sequence to avoid need of lazyness.
 
 ## Examples
 
@@ -198,7 +199,7 @@ TC_Right { value: [ 151 ] }
 
 - **endBy1(p)(sep)(end)** parses one or more ocourences of `p` separated by `sep` droping the separators and terminating with `end`
 
-- **boot()** non-consume happy parser.
+- **boot()** non-consume happy parser. _you should not need this_
 
 > boot is an identity parser, will just output the given input as a successful parse. So it never fails or consumes.  
 We use it to turn binary combinators into unary metaparsers. That is the case of `.skip(...)`, it uses the `boot()` parser to be available as a unary modifier `skip()`.  
