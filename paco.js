@@ -65,14 +65,20 @@ const satisfy=chk=>parserOf(chk.expect||"to satisfy condition")(io=>{
     :Left( Pair(io.fst(),chk.expect||satisfy(chk).expect))
 })
 
-const string=str=>parserOf("string `"+str+"`")(
-  function(io){
-    // clog(io,this)
-    if(io.fst().startsWith(str))
-      return Right(Pair(io.fst().substr(str.length),io.snd().append(str)))
-    return Left(io.map(_=>str))
-  }
-)
+//this one use the javascript `startsWith` function...
+//this parser will never consume on fail
+// const string=str=>parserOf("string `"+str+"`")(
+//   function(io){
+//     // clog(io,this)
+//     if(io.fst().startsWith(str))
+//       return Right(Pair(io.fst().substr(str.length),io.snd().append(str)))
+//     return Left(io.map(_=>str))
+//   }
+// )
+//use this one for a character at a time parsing, 
+//here error report will be at character match
+const string=str=>parserOf("string `"+str+"`")
+  (foldl1(a=>b=>a.then(b))(str.split("").map(o=>char(o))).join())
 
 const char=c=>satisfy(isChar(c))
 const oneOf=cs=>satisfy(isOneOf(cs))
@@ -94,9 +100,19 @@ const eof=satisfy(isEof)
 
 const optional=p=>parserOf("optional ",p.expect)(io=>p(io).or(Right(io)))
 const choice=ps=>foldl1(a=>b=>a.or(b))(ps)
-
 const many=p=>parserOf("many ",p.expect)(io=>p.then(many(p))(io).or(Right(io)))
 const many1=p=>parserOf("at least one "+p.expect)(p.then(many(p)))
+const count=n=>p=>parserOf(n+" of "+p.expect)
+  (io=>io.snd().length<n?p.then(count(n)(p))(io):Right(io))
+const between=open=>p=>close=>skip(open).then(p).skip(close)
+const option=x=>p=>parserOf("option "+p.expect)(io=>p(io).or(Right(Pair(io.fst(),x))))
+const optionMaybe=p=>parserOf("maybe "+p.expect)(io=>p.as(Just)(io).or(Right(Pair(io.fst(),Nothing()))))
+const sepBy=p=>sep=>parserOf(p.expect+" separated by "+sep.expect)
+  (io=>p.then(many(skip(sep).then(p)))(io).or(Right(Pair(io.fst(),[]))))
+const sepBy1=p=>sep=>parserOf(p.expect+" separated by "+sep.expect)
+(io=>p.then(many(skip(sep).then(p)))(io))
+const endBy=p=>sep=>end=>sepBy(p)(sep).then(skip(end))
+const endBy1=p=>sep=>end=>sepBy1(p)(sep).then(skip(end))
 
 const spaces=many(space)
 const blanks=many(blank)
@@ -146,5 +162,11 @@ exports.many=many
 exports.many1=many1
 exports.optional=optional
 exports.choice=choice
+exports.count=count
+exports.between=between
+exports.option=option
+exports.optionMaybe=optionMaybe
+exports.sepBy=sepBy
+exports.endBy=endBy
+exports.endBy1=endBy1
 exports.parse=parse
-

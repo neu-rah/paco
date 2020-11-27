@@ -182,6 +182,22 @@ TC_Right { value: [ 151 ] }
 
 - **choice\[ps]** parse from a list of alternative parsers, this is just an abbreviation of `.or` sequence.
 
+- **count(n)(p)** parses `n` ocourences of `p`
+
+- **between(open)(p)(close)** parses `p` surounded by `open` and `close`, dropping the delimiters
+
+- **option(x)(p)** parses `p` or returns `x` if it fails, this parser never fails.
+
+- **optionMaybe(p)** parse `p` and returns `Just` the result or `Nothing` if it fails, this parser never fails
+
+- **sepBy(p)(sep)** parses zero or more ocourences of `p` separated by `sep` and droping the separators, this parser never fails.
+
+- **sepBy1(p)(sep)** parses one or more ocourences of `p` separated by `sep` and droping the separators, this parser never fails.
+
+- **endBy(p)(sep)(end)** parses zero or more ocourences of `p` separated by `sep` droping the separators and terminating with `end`
+
+- **endBy1(p)(sep)(end)** parses one or more ocourences of `p` separated by `sep` droping the separators and terminating with `end`
+
 - **boot()** non-consume happy parser.
 
 > boot is an identity parser, will just output the given input as a successful parse. So it never fails or consumes.  
