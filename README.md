@@ -11,6 +11,7 @@ const p=
 
 parse(p)("#AN-123")
 ```
+> _note: `parseInt` could have been used in place of `o=>o*1`_
 
 outputs:
 ```javascript
@@ -53,7 +54,7 @@ a parser can be stored, combined, passed around and perform parsing on many cont
 ### Still missing
 
 ~~**Lazyness** right now the alternative parsers will ALL try to parse due to the strict nature of javascript.~~
-inserted a stricty check between the alternative sequence to avoid need of lazyness.
+inserted a strict check between the alternative sequence to avoid the need of lazyness.
 
 ## Examples
 
@@ -63,9 +64,9 @@ testing a simple parser
 #>digits(Pair("123",[]))
 TC_Right { value: TC_Pair { a: '', b: [ '1', '2', '3' ] } }
 ```
-This is the basic form of parsing (feeding a parser). However a `parse` function is available:
+This is the basic form of parsing (feeding a parser). 
 
-it will perform as the former but with only output state
+However a `parse` function is available, it will perform as the former but gives only output state or a fancy error message.
 
 ```javascript
 #>parse(digits)("123")
@@ -241,4 +242,19 @@ TC_Right { value: TC_Pair { a: '', b: [ '1' ] } }
 TC_Right { value: TC_Pair { a: '', b: [ 'a' ] } }
 #>letter.or(digit)(Pair("#123",[]))
 TC_Left { value: TC_Pair { a: '#123', b: 'letter or digit' } }
+```
+
+- **.expect**
+
+as a consequence of the error report system we got a parser description for free, no great effort was put to it thou
+
+```javascript
+#>console.log(optional(skip(char('#'))).then(many1(letter).join()).skip(char('-')).then(digits.join().as(parseInt)).expect)
+```
+obtained description:
+```text
+optional skip character `#`
+then (at least one letter)->join()
+skip character `-`
+then ((many(digit))->join())->as(parseInt)
 ```

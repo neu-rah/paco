@@ -35,8 +35,8 @@ const prim=require("./src/primitives")
 //recursively extends the parser continuations (.then, .skip, .or, ...)
 const parserOf=e=>o=>{
   o.parse=s=>o(Pair(s,[]))
-  o.then=p=>parserOf(o.expect+" then "+p.expect)(io=>io.mbind(o).mbind(p))
-  o.skip=p=>parserOf(o.expect+" skip "+p.expect)(io=>{
+  o.then=p=>parserOf(o.expect+"\nthen "+p.expect)(io=>io.mbind(o).mbind(p))
+  o.skip=p=>parserOf(o.expect+"\nskip "+p.expect)(io=>{
     const os=io.mbind(o)
     return os.mbind(p).map(map(o=>snd(fromRight(os)))).when(os)
   })
@@ -47,8 +47,14 @@ const parserOf=e=>o=>{
       if(isRight(r)) return r;
       return r.or(p(io)).or(Left(Pair(io.fst(),o.or(p).expect)))
     })
-  o.as=f=>parserOf(o.expect+" transform")(io=>Pair(io.fst(),[]).mbind(o).map(map(f)).map(map(x=>io.snd().append(x))))
-  o.join=p=>typeof p=="undefined"?o.as(mconcat):o.as(o=>o.join(p))
+  const xfname=f=>{
+    const ff=f.name||f.toString()
+    return ff.length<15?ff:ff.substr(0,12)+"..."
+  }
+  o.as=f=>parserOf("("+o.expect+")->as("+xfname(f)+")")(io=>Pair(io.fst(),[]).mbind(o).map(map(f)).map(map(x=>io.snd().append(x))))
+  o.join=p=>parserOf
+    (typeof p==="undefined"?"("+o.expect+")->join()":"("+o.expect+")->join(\""+p+"\")")
+    (io=>typeof p==="undefined"?o.as(mconcat)(io):o.as(o=>o.join(p))(io))
   o.expect=e
   return (self=>o)(o)
 }
@@ -57,7 +63,7 @@ const parserOf=e=>o=>{
 //and id parse combinator to apply continuations on root elements
 const boot=()=>parserOf("")(fcomp(Right)(id))
 
-const skip=o=>boot().skip(o)//apply skip (continuation) to the root element, using `boot` combinator
+const skip=o=>parserOf("skip "+o.expect)(io=>boot().skip(o)(io))//apply skip (continuation) to the root element, using `boot` combinator
 
 const satisfy=chk=>parserOf(chk.expect||"to satisfy condition")(io=>{
   // clog("satisfy",chk.expect)
@@ -102,9 +108,9 @@ const cr=satisfy(is_cr)
 const blank=satisfy(isBlank)
 const eof=satisfy(isEof)
 
-const optional=p=>parserOf("optional ",p.expect)(io=>p(io).or(Right(io)))
+const optional=p=>parserOf("optional "+p.expect)(io=>p(io).or(Right(io)))
 const choice=ps=>foldl1(a=>b=>a.or(b))(ps)
-const many=p=>parserOf("many ",p.expect)(io=>p.then(many(p))(io).or(Right(io)))
+const many=p=>parserOf("many("+p.expect+")")(io=>p.then(many(p))(io).or(Right(io)))
 const many1=p=>parserOf("at least one "+p.expect)(p.then(many(p)))
 const count=n=>p=>parserOf(n+" of "+p.expect)
   (io=>io.snd().length<n?p.then(count(n)(p))(io):Right(io))
