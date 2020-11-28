@@ -249,12 +249,27 @@ TC_Left { value: TC_Pair { a: '#123', b: 'letter or digit' } }
 as a consequence of the error report system we got a parser description for free, no great effort was put to it thou
 
 ```javascript
-#>console.log(optional(skip(char('#'))).then(many1(letter).join()).skip(char('-')).then(digits.join().as(parseInt)).expect)
+#>console.log(optional(skip(char('#'))).then(many1(letter).join()).skip(char('-').or(spaces1)).then(digits.join().as(parseInt)).expect)
 ```
 obtained description:
 ```text
 optional skip character `#`
 then (at least one letter)->join()
-skip character `-`
-then ((many(digit))->join())->as(parseInt)
+skip character `-` or at least one space
+then ((digits)->join())->as(parseInt)
+```
+
+running:
+```javascript
+const p=
+  optional(skip(char('#')))
+  .then(many1(letter).join())
+  .skip(char('-').or(spaces1))
+  .then(digits.join().as(parseInt))
+
+console.log(parse(p)("#AN-123"))
+```
+result:
+```javascript
+TC_Right { value: [ 'AN', 123 ] }
 ```

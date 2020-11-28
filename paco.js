@@ -85,7 +85,7 @@ const satisfy=chk=>parserOf(chk.expect||"to satisfy condition")(io=>{
 //     return Left(io.map(_=>str))
 //   }
 // )
-//use this one for a character at a time parsing, 
+//use this one for a "character at a time" parsing, 
 //here error report will be at character match
 const string=str=>parserOf("string `"+str+"`")
   (foldl1(a=>b=>a.then(b))(str.split("").map(o=>char(o))).join())
@@ -129,6 +129,11 @@ const blanks=many(blank)
 const spaces1=many1(space)
 const blanks1=many1(blank)
 const digits=many(digit)
+spaces.expect="spaces"
+blanks.expect="white space"
+spaces1.expect="at least one space"
+blanks1.expect="some white space"
+digits.expect="digits"
 
 const parse=p=>str=>{
   const r=p(Pair(str,[]))
@@ -180,3 +185,10 @@ exports.sepBy=sepBy
 exports.endBy=endBy
 exports.endBy1=endBy1
 exports.parse=parse
+
+const p=optional(skip(char('#')))
+  .then(many1(letter).join())
+  .skip(char('-').or(spaces1))
+  .then(digits.join().as(parseInt))
+
+console.log(parse(p)("#AN-123"))
