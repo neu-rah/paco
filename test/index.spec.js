@@ -22,10 +22,13 @@ patchPrimitives(
 )
 
 const {
-  char,oneOf,noneOf,range,many,many1,parse,
-  satisfy,boot,skip,
+  anyChar,char,oneOf,noneOf,range,satisfy,boot,skip,
   digit,lower,upper,letter,alphaNum,hexDigit,octDigit,
-  space,tab,nl,cr,blank,eof,string
+  space,tab,nl,cr,blank,
+  digits,spaces,blanks,spaces1,blanks1,eof,
+  string,regex,many,many1,optional,
+  choice,count,between,option,optionMaybe,sepBy,endByendBy1,
+  parse,
 }=require("../paco.js")
 
 ///////////////////////////////////////////
@@ -38,7 +41,7 @@ describe("Parser",function() {
     assert(isLeft(parse(char('x'))("")),"eof fail")
   })
 })
-describe("String parser",function() {
+describe("Character parsers",function() {
   it("satisfy",async ()=>{
     assert.deepStrictEqual(parse(satisfy(_=>true))("."),Right(["."]),"satisfy")
     assert(isLeft(parse(satisfy(_=>false))("a")),"satisfy fail")
@@ -72,11 +75,24 @@ describe("String parser",function() {
     assert.deepStrictEqual(parse(alphaNum)("N"),Right(["N"]),"alphaNum")
     assert(isLeft(parse(alphaNum)("#")),"alphaNum fail")
   })
+  it("oneOf",async ()=>{
+    assert.deepStrictEqual(parse(oneOf("01"))("0"),Right(["0"]),"alphaNum")
+    assert.deepStrictEqual(parse(oneOf("01"))("1"),Right(["1"]),"alphaNum")
+    assert(isLeft(parse(oneOf("01"))("#")),"oneOf fail")
+  })
+  it("noneOf",async ()=>{
+    assert.deepStrictEqual(parse(noneOf("01"))("x"),Right(["x"]),"alphaNum")
+    assert(isLeft(parse(noneOf("01"))("1")),"oneOf fail")
+  })
 })
-describe("string",function() {
+describe("String parsers",function() {
   it("string",async ()=>{
     assert.deepStrictEqual(parse(string("ok"))("oks"),Right(["ok"]))
     assert(isLeft(parse(string("ok"))("onks")))
+  })
+  it("regex match",async ()=>{
+    assert.deepStrictEqual(parse(regex("#([a-zA-Z]+)[ -]([0-9]+)"))("#an-123..."),Right(["an","123"]))
+    assert(isLeft(parse(regex("[0-9]"))("o")))
   })
 })
 describe("bindings",function() {
@@ -113,7 +129,7 @@ describe("bindings",function() {
       parse(letter.then(digit.then(digit).join()))("a12"),
       Right(["a","12"]),"group and join subset")
     assert.deepStrictEqual(
-      parse(letter.then(digit.then(digit).join().as(o=>o*1)))("a12"),
+      parse(letter.then(digit.then(digit).join().as(parseInt)))("a12"),
       Right(["a",12]),"group, join and transform subset")
   })
 })
@@ -127,12 +143,78 @@ describe("Metaparsers",function() {
       parse(many(digit).join())(""),
       Right([]),"repeat a parser option"
     )
-    assert.deepStrictEqual(
+  })
+  it("many1",async ()=>{
+      assert.deepStrictEqual(
       parse(many1(digit).join())("123"),
       Right(["123"]),"repeat a parser once or more"
     )
     assert(
       isLeft(parse(many1(digit).join())("a")),"repeat a parser once or more fail"
+    )
+  })
+  it("optional",async ()=>{
+    assert.deepStrictEqual(
+      parse(optional(digits).then(letter).join())("123a"),
+      Right(["123a"]),"optional composition found"
+    )
+    assert.deepStrictEqual(
+      parse(optional(digits).then(letter).join())("a..."),
+      Right(["a"]),"optional composition missing"
+    )
+    assert(
+      isLeft(parse(optional(digits).then(letter).join())("#1a")),"optional composition fail"
+    )
+  })
+  it("choice",async ()=>{
+    const parsing=parse(choice([digit,letter]))
+    assert.deepStrictEqual(
+      parsing("1"),
+      Right(["1"]),"choice found"
+    )
+    assert.deepStrictEqual(
+      parsing("a"),
+      Right(["a"]),"choice found"
+    )
+    assert(
+      isLeft(parsing("#")),"choice fail"
+    )
+  })
+  it("count",async ()=>{
+    const parsing=parse(count(2)(digit).join())
+    assert.deepStrictEqual(
+      parsing("123"),
+      Right(["12"]),"count found"
+    )
+    assert(
+      isLeft(parsing("1a")),"count fail"
+    )
+    assert(
+      isLeft(parsing("1")),"count fail"
+    )
+    assert(
+      isLeft(parsing("")),"count fail"
+    )
+  })
+  it("between",async ()=>{
+    const parsing=parse(between(space)(many1(noneOf(" ")))(space).join())
+    assert.deepStrictEqual(
+      parsing(" ab.12 "),
+      Right(["ab.12"]),"between match"
+    )
+    assert(
+      isLeft(parsing("#")),"between fail"
+    )
+  })
+  it("option",async ()=>{
+    const parsing=parse(option(["0"])(digit))
+    assert.deepStrictEqual(
+      parsing("1"),
+      Right(["1"]),"option match"
+    )
+    assert.deepStrictEqual(
+      parsing("#"),
+      Right(["0"]),"option use default"
     )
   })
 })

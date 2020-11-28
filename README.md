@@ -174,6 +174,13 @@ TC_Right { value: [ 151 ] }
 
 - **string("...")** match with given string
 
+- **regex(expr)** match with regex expression
+
+```javascript
+#>parse(regex("#([a-zA-Z]+)[ -]([0-9]+)"))("#an-123...")
+TC_Right { value: [ 'an', '123' ] }
+```
+
 - **skip(...)** ignore the group/parser output
 
 - **many(p)** optional many ocourences or parser `p` targets. This parser never fails as it can return an empty list.
@@ -186,9 +193,24 @@ TC_Right { value: [ 151 ] }
 
 - **count(n)(p)** parses `n` ocourences of `p`
 
-- **between(open)(p)(close)** parses `p` surounded by `open` and `close`, dropping the delimiters
+- **between(open)(p)(close)** parses `p` surounded by `open` and `close`, dropping the delimiters.  
+Be sure to exclude the delimiters from the content or provide any other meaning of content end
+
+```javascript
+#>parse(between(space)(many1(noneOf(" ")))(space).join())(" ab.12 ")
+TC_Right { value: [ 'ab.12' ] }
+```
 
 - **option(x)(p)** parses `p` or returns `x` if it fails, this parser never fails.
+
+```javascript
+#>parse(option(["0"])(digit))("1")
+TC_Right { value: [ '1' ] }
+#>parse(option(["0"])(digit))("")
+TC_Right { value: [ '0' ] }
+#>parse(option(["0"])(digit))("#")
+TC_Right { value: [ '0' ] }
+```
 
 - **optionMaybe(p)** parse `p` and returns `Just` the result or `Nothing` if it fails, this parser never fails
 

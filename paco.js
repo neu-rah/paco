@@ -25,7 +25,7 @@ patchPrimitives(
 // Parser
 
 const {
-  isChar,isOneOf,isNoneOf,inRange,
+  isAnyChar,isChar,isOneOf,isNoneOf,inRange,
   isDigit,isLower,isUpper,isLetter,isAlphaNum,isHexDigit,isOctDigit,
   isSpace,isTab,is_nl,is_cr,isBlank,isEof
 }=require("./src/primitives")
@@ -90,6 +90,15 @@ const satisfy=chk=>parserOf(chk.expect||"to satisfy condition")(io=>{
 const string=str=>parserOf("string `"+str+"`")
   (foldl1(a=>b=>a.then(b))(str.split("").map(o=>char(o))).join())
 
+const regex=e=>parserOf("regex /"+e+"/")
+(io=>{
+  const r=io.fst().match(e)
+  return r===null?
+    Left(Pair(io.fst(),regex(e).expect)):
+    Right(Pair(r.input.substr(r[0].length),r.slice(1,r.length)))
+})
+
+const anyChar=satisfy(isAnyChar)
 const char=c=>satisfy(isChar(c))
 const oneOf=cs=>satisfy(isOneOf(cs))
 const noneOf=cs=>satisfy(isNoneOf(cs))
@@ -137,16 +146,19 @@ digits.expect="digits"
 
 const parse=p=>str=>{
   const r=p(Pair(str,[]))
-  return isRight(r)?
-    r.map(snd):
-    Left(
+  if(isRight(r)) return r.map(snd)
+  else {
+    const found=head(fromLeft(r).fst())
+    return Left(
       "error, expecting "+fromLeft(r).snd()
-      +" but found `"+head(fromLeft(r).fst())
-      +"` here->"+fromLeft(r).fst().substr(0,10)+"..."
+      +" but found `"+(found||"eof")+"`"
+      +(found?" here->"+fromLeft(r).fst().substr(0,10)+"...":"")
     )
+  }
 }
 
 exports.satisfy=satisfy
+exports.anyChar=anyChar
 exports.char=char
 exports.oneOf=oneOf
 exports.noneOf=noneOf
@@ -170,6 +182,7 @@ exports.blanks1=blanks1
 exports.digits=digits
 exports.eof=eof
 exports.string=string
+exports.regex=regex
 
 exports.boot=boot
 exports.skip=skip
@@ -186,9 +199,3 @@ exports.endBy=endBy
 exports.endBy1=endBy1
 exports.parse=parse
 
-const p=optional(skip(char('#')))
-  .then(many1(letter).join())
-  .skip(char('-').or(spaces1))
-  .then(digits.join().as(parseInt))
-
-console.log(parse(p)("#AN-123"))

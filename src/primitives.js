@@ -3,9 +3,10 @@
 const chkOf=m=>p=>(p.expect=m,p)
 
 //parser primitves
+const isAnyChar=chkOf("any character")(o=>typeof o!=="undefined")
 const isChar=c=>chkOf("character `"+c+"`")(o=>c==o)
 const isOneOf=cs=>chkOf("one of `"+cs+"`")(o=>cs.indexOf(o)>-1)
-const isNoneOf=cs=>chkOf("none of `"+cs+"`")(o=>cs.indexOf(o)==-1)
+const isNoneOf=cs=>chkOf("none of `"+cs+"`")(o=>typeof o!=="undefined"&&cs.indexOf(o)==-1)
 const inRange=(a,z)=>chkOf("character in range from `"+a+"` to `"+z+"´")(o=>a<=o&&o<=z)
 
 const isDigit=chkOf("digit")(inRange('0','9'))
@@ -14,6 +15,7 @@ const isUpper=chkOf("upper letter")(inRange('A','Z'))
 const isLetter=chkOf("letter")(o=>isLower(o)||isUpper(o))
 const isEof=chkOf("eof")(o=>typeof i==="undefined")
 
+exports.isAnyChar=isAnyChar
 exports.isChar=isChar
 exports.isOneOf=isOneOf
 exports.isNoneOf=isNoneOf
