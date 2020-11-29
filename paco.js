@@ -1,6 +1,8 @@
 "use strict";
 
 const {log,clog,xlog,debuging}=require("./src/debug")
+const {Msg,Expect,Error}=require("./src/error")
+const {StringStream}=require("./src/strstr.js")
 
 const {
   patchPrimitives,//patch primitive data types
@@ -35,23 +37,34 @@ const prim=require("./src/primitives")
 //recursively extends the parser continuations (.then, .skip, .or, ...)
 const parserOf=e=>o=>{
   o.parse=s=>o(Pair(s,[]))
+  o.post=f=>parserOf
+    (o.expect+" verify of "+f)
+    (io=>f(o(io)))
+  o.chk=m=>f=>parserOf(o.expect+" check of "+f)
+    (io=>{
+      const r=o.onFailMsg(m)(io)
+      if(isLeft(r)||f(fromRight(r).snd())) return r
+      return Left(Pair(io.fst(),new Error(m)))
+    })
   o.then=p=>parserOf(o.expect+"\nthen "+p.expect)(io=>io.mbind(o).mbind(p))
   o.skip=p=>parserOf(o.expect+"\nskip "+p.expect)(io=>{
     const os=io.mbind(o)
     return os.mbind(p).map(map(o=>snd(fromRight(os)))).when(os)
   })
-  o.failsWith=msg=>parserOf(msg)(io=>o(io).or(Left(Pair(io.fst(),msg))))
+  o.onFailMsg=msg=>parserOf(msg)(io=>o(io).or(Left(Pair(io.fst(),new Error(msg)))))
   o.or=p=>parserOf(o.expect+" or "+p.expect)//using alternative <|>
     (io=>{
       const r=o(io)
       if(isRight(r)) return r;
-      return r.or(p(io)).or(Left(Pair(io.fst(),o.or(p).expect)))
+      return r.or(p(io)).or(Left(Pair(io.fst(),new Expect(o.or(p).expect))))
     })
   const xfname=f=>{
     const ff=f.name||f.toString()
     return ff.length<15?ff:ff.substr(0,12)+"..."
   }
-  o.as=f=>parserOf("("+o.expect+")->as("+xfname(f)+")")(io=>Pair(io.fst(),[]).mbind(o).map(map(f)).map(map(x=>io.snd().append(x))))
+  o.as=f=>parserOf
+    ("("+o.expect+")->as("+xfname(f)+")")
+    (io=>Pair(io.fst(),[]).mbind(o).map(map(f)).map(map(x=>io.snd().append(x))))
   o.join=p=>parserOf
     (typeof p==="undefined"?"("+o.expect+")->join()":"("+o.expect+")->join(\""+p+"\")")
     (io=>typeof p==="undefined"?o.as(mconcat)(io):o.as(o=>o.join(p))(io))
@@ -60,11 +73,13 @@ const parserOf=e=>o=>{
 }
 
 // Combinators --------------
-//and id parse combinator to apply continuations on root elements
+//an "id" combinator to apply continuations on root elements
 const boot=()=>parserOf("")(fcomp(Right)(id))
 
-const skip=o=>parserOf("skip "+o.expect)(io=>boot().skip(o)(io))//apply skip (continuation) to the root element, using `boot` combinator
+//apply skip (continuation) to the root element, using `boot` combinator
+const skip=o=>parserOf("skip "+o.expect)(io=>boot().skip(o)(io))
 
+//check a character with a boolean function
 const satisfy=chk=>parserOf(chk.expect||"to satisfy condition")(io=>{
   // clog("satisfy",chk.expect)
   return chk(head(io.fst()))?
@@ -72,32 +87,23 @@ const satisfy=chk=>parserOf(chk.expect||"to satisfy condition")(io=>{
       Pair(//build a pair of remaining input and composed output
         tail(io.fst()),//consume input
         io.snd().append([head(io.fst())])))//compose the outputs
-    :Left( Pair(io.fst(),chk.expect||satisfy(chk).expect))
+    :Left( Pair(io.fst(),new Expect(chk.expect||satisfy(chk).expect)))//or report error
 })
 
-//this one use the javascript `startsWith` function...
-//this parser will never consume on fail
-// const string=str=>parserOf("string `"+str+"`")(
-//   function(io){
-//     // clog(io,this)
-//     if(io.fst().startsWith(str))
-//       return Right(Pair(io.fst().substr(str.length),io.snd().append(str)))
-//     return Left(io.map(_=>str))
-//   }
-// )
-//use this one for a "character at a time" parsing, 
-//here error report will be at character match
+//match a string
 const string=str=>parserOf("string `"+str+"`")
   (foldl1(a=>b=>a.then(b))(str.split("").map(o=>char(o))).join())
 
+//regex match
 const regex=e=>parserOf("regex /"+e+"/")
 (io=>{
   const r=io.fst().match(e)
   return r===null?
-    Left(Pair(io.fst(),regex(e).expect)):
+    Left(Pair(io.fst(),new Expect(regex(e).expect))):
     Right(Pair(r.input.substr(r[0].length),r.slice(1,r.length)))
 })
 
+//character parsers
 const anyChar=satisfy(isAnyChar)
 const char=c=>satisfy(isChar(c))
 const oneOf=cs=>satisfy(isOneOf(cs))
@@ -117,6 +123,7 @@ const cr=satisfy(is_cr)
 const blank=satisfy(isBlank)
 const eof=satisfy(isEof)
 
+//meta-parsers
 const optional=p=>parserOf("optional "+p.expect)(io=>p(io).or(Right(io)))
 const choice=ps=>foldl1(a=>b=>a.or(b))(ps)
 const many=p=>parserOf("many("+p.expect+")")(io=>p.then(many(p))(io).or(Right(io)))
@@ -127,35 +134,42 @@ const between=open=>p=>close=>skip(open).then(p).skip(close)
 const option=x=>p=>parserOf("option "+p.expect)(io=>p(io).or(Right(Pair(io.fst(),x))))
 const optionMaybe=p=>parserOf("maybe "+p.expect)(io=>p.as(Just)(io).or(Right(Pair(io.fst(),Nothing()))))
 const sepBy=p=>sep=>parserOf(p.expect+" separated by "+sep.expect)
-  (io=>p.then(many(skip(sep).then(p)))(io).or(Right(Pair(io.fst(),[]))))
+  (io=>p.then(many(skip(sep).then(p)))(io))//.or(Right(Pair(io.fst(),[]))))
 const sepBy1=p=>sep=>parserOf(p.expect+" separated by "+sep.expect)
 (io=>p.then(many(skip(sep).then(p)))(io))
 const endBy=p=>sep=>end=>sepBy(p)(sep).then(skip(end))
 const endBy1=p=>sep=>end=>sepBy1(p)(sep).then(skip(end))
 
-const spaces=many(space)
-const blanks=many(blank)
-const spaces1=many1(space)
-const blanks1=many1(blank)
-const digits=many(digit)
-spaces.expect="spaces"
-blanks.expect="white space"
-spaces1.expect="at least one space"
-blanks1.expect="some white space"
-digits.expect="digits"
+//high order character parser
+const spaces=many(space);spaces.expect="spaces"
+const blanks=many(blank);blanks.expect="white space"
+const spaces1=many1(space);spaces1.expect="at least one space"
+const blanks1=many1(blank);blanks1.expect="some white space"
+const digits=many(digit);digits.expect="digits"
 
-const parse=p=>str=>{
-  const r=p(Pair(str,[]))
+//interpret a result and enventually build an error message
+const res=fn=>r=>{
   if(isRight(r)) return r.map(snd)
   else {
-    const found=head(fromLeft(r).fst())
-    return Left(
-      "error, expecting "+fromLeft(r).snd()
-      +" but found `"+(found||"eof")+"`"
-      +(found?" here->"+fromLeft(r).fst().substr(0,10)+"...":"")
-    )
+    const rr=fromLeft(r)
+    var fpos=fn
+    // clog("error obj:",r,"rr",rr)
+    if(typeof rr.fst().line!=="undefined") {
+      const pos=rr.fst().getPos()
+      fpos+=":"+pos.join(":")+"\n"
+    }
+    const found=head(rr.fst())//the char to blame
+    return rr.snd().isError()?
+      Left(fpos+"error, "+rr.snd()):
+      Left(
+        fpos+"error, expecting "+rr.snd()
+        +" but found `"+(found||"eof")+"`"
+        +(found?" here->"+found.toString().substr(0,10)+"...":"")
+      )
   }
 }
+
+const parse=fn=>p=>str=>res(fn)(p(Pair(str,[])))
 
 exports.satisfy=satisfy
 exports.anyChar=anyChar
@@ -195,7 +209,8 @@ exports.between=between
 exports.option=option
 exports.optionMaybe=optionMaybe
 exports.sepBy=sepBy
+exports.sepBy1=sepBy1
 exports.endBy=endBy
 exports.endBy1=endBy1
+exports.res=res
 exports.parse=parse
-

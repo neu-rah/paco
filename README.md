@@ -20,19 +20,7 @@ TC_Right { value: [ 'AN', 123 ] }
 
 All parsers can chain up or group to form other parsers.
 
-The chaining is done with `.then` or `.skip`, the first combines the output, while the second will drop it.
-
-Parsers can alternate with `.or`
-
-Parse output can be formated with `.as`, it will apply to the parser or group where inserted. `.as` will accept an output transformer function.
-
-Output transformations can stack up.
-
-`.join()` and `.join(«sep»)` are shortcuts for `.as(mappend)` and `.as(o=>o.join(«sep»))`
-
-Parsers can group by nesting ex: `x.then( y.then(z).join("") )`, here the join will only apply to the (y.z) results.
-
-For now parsers accept a state pair of (input,output) and will return `Either` a pair of input state and an error string or a pair od input state and parsed content.
+For now parsers accept a state pair of (input,output) and will return `Either` a pair of input state and an error or a pair of input state and parsed content.
 
 _*expect changes on this arguments format_
 
@@ -40,10 +28,35 @@ Some available metaparsers like `many()`, `many1()`, `skip()` can accept other p
 
 Some parsers are already a composition with metaparsers, that is the case of `digits`, it will perform `many(digit)`.
 
-`.failsWith(msg)` provides a message for failing parser
+---
+## .then | .skip
+The chaining is done with `.then` or `.skip`, the first combines the output, while the second will drop it.
 
+## .or
+Parsers can alternate with `.or`
+
+## .as
+Parse output can be formated with `.as`, it will apply to the parser or group where inserted. `.as` will accept an output transformer function.
+
+Output transformations can stack up.
+
+## .join
+`.join()` and `.join(«sep»)` are shortcuts for `.as(mappend)` and `.as(o=>o.join(«sep»))`
+
+Parsers can group by nesting ex: `x.then( y.then(z).join("") )`, here the join will only apply to the (y.z) results.
+
+## .chk
+`.chk(m)(f)` this function `f` will receive the parse group  result (list) and should return `true` if approved or `false` to resume in error with message `m`.
+
+## .post
+`.post(f)` post-processing the result, this is still a static parser definition. Function `f` return will replace the previous result.
+
+## .onFailMsg
+`.onFailMsg(msg)` provides a message for a failing parser
+
+## .parse
 `.parse("...")` can be used to quick feed a string to any parser.
-The result will include both input and output state.
+The result will include both input and output state.  
 
 _use `parse` function to get only output_
 
@@ -51,10 +64,12 @@ all transformation definitions should be applyed to the parser and not to the re
 
 a parser can be stored, combined, passed around and perform parsing on many contents many times, all transitory state is kept outside.
 
-### Still missing
+Untill now, all failing parsers do not consume... lets see...
+
+## Still missing
 
 ~~**Lazyness** right now the alternative parsers will ALL try to parse due to the strict nature of javascript.~~
-inserted a strict check between the alternative sequence to avoid the need of lazyness.
+_inserted a strict check between the alternative sequence to avoid the need of lazyness._
 
 ## Examples
 
@@ -69,7 +84,7 @@ This is the basic form of parsing (feeding a parser).
 However a `parse` function is available, it will perform as the former but gives only output state or a fancy error message.
 
 ```javascript
-#>parse(digits)("123")
+#>parse(">")(digits)("123")
 TC_Right { value: [ '1', '2', '3' ] }
 ```
 Same with
@@ -234,14 +249,16 @@ Right . id
 
 ## utility
 
-- **parse** `parse(parser)(input string)`
+- **parse** 
+
+`parse(filename)(parser)(input string or stream)`
 
 ```javascript
-#>parse(letter.or(digit))("1")
+#>parse(">")(letter.or(digit))("1")
 TC_Right { value: [ '1' ] }
-#>parse(letter.or(digit))("a")
+#>parse(">")(letter.or(digit))("a")
 TC_Right { value: [ 'a' ] }
-#>parse(letter.or(digit))("#123")
+#>parse(">")(letter.or(digit))("#123")
 TC_Left {
   value: 'error, expecting letter or digit but found `#` here->#123' }
 ```
@@ -264,6 +281,20 @@ TC_Right { value: TC_Pair { a: '', b: [ '1' ] } }
 TC_Right { value: TC_Pair { a: '', b: [ 'a' ] } }
 #>letter.or(digit)(Pair("#123",[]))
 TC_Left { value: TC_Pair { a: '#123', b: 'letter or digit' } }
+```
+
+- **res(r)** 
+
+process a parser return to produce a result or error message, discarding input state description.
+
+```javascript
+#>res(letter.then(digits).parse("123"))
+TC_Left { value: 'error, expecting letter but found `1` here->1...' }
+```
+without `res()` procesing
+```javascript
+#>letter.then(digits).parse("123")
+TC_Left { value: TC_Pair { a: '123', b: 'letter' } }
 ```
 
 - **.expect**
