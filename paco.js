@@ -121,7 +121,7 @@ const letter=satisfy(isLetter)
 const alphaNum=satisfy(isAlphaNum)
 const hexDigit=satisfy(isHexDigit)
 const octDigit=satisfy(isOctDigit)
-const space=satisfy(isSpace);space.expect="sapce"
+const space=satisfy(isSpace);space.expect="space"
 const tab=satisfy(isTab);tab.expect="tab"
 const nl=satisfy(is_nl);nl.expect="new-line"
 const cr=satisfy(is_cr);cr.expect="carryage return"
@@ -133,6 +133,9 @@ const optional=p=>parserOf("optional "+p.expect)(io=>p(io).or(Right(io)))
 const choice=ps=>foldl1(a=>b=>a.or(b))(ps)
 const many=p=>parserOf("many("+p.expect+")")(io=>p.then(many(p))(io).or(Right(io)))
 const many1=p=>parserOf("at least one "+p.expect)(p.then(many(p)))
+const manyTill=curry((p,e)=>parserOf
+  ("many "+p.expect+" until "+e.expect)
+  (io=>skip(e).or(p.then(manyTill(p,e)))(io)))
 const count=curry((n,p)=>parserOf(n+" of "+p.expect)
   (io=>io.snd().length<n?p.then(count(n)(p))(io):Right(io)))
 const between=curry((open,p,close)=>skip(open).then(p).skip(close))
