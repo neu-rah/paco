@@ -35,6 +35,10 @@ The chaining is done with `.then` or `.skip`, the first combines the output, whi
 ## .or
 Parsers can alternate with `.or`
 
+## .notFollowedBy(p)
+
+parser succeeds only if `p` fails
+
 ## .as
 Parse output can be formated with `.as`, it will apply to the parser or group where inserted. `.as` will accept an output transformer function.
 
