@@ -211,6 +211,7 @@ exports.none=none
 exports.skip=skip
 exports.many=many
 exports.many1=many1
+exports.manyTill=manyTill
 exports.optional=optional
 exports.choice=choice
 exports.count=count

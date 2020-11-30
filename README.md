@@ -204,6 +204,8 @@ TC_Right { value: [ 'an', '123' ] }
 
 - **many1(p)** one or more ocourences of parser `p` targets
 
+- **manyTill(p,end)** one or more ocourences of parser `p` terminating with parser `end`
+
 - **optional(p)** parse `p` if present, otherwise ignore and continue parsing
 
 - **choice\[ps]** parse from a list of alternative parsers, this is just an abbreviation of `.or` sequence.
