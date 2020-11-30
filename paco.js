@@ -113,7 +113,7 @@ const anyChar=satisfy(isAnyChar)
 const char=c=>satisfy(isChar(c))
 const oneOf=cs=>satisfy(isOneOf(cs))
 const noneOf=cs=>satisfy(isNoneOf(cs))
-const range=(a,z)=>c=>satisfy(inRange(a,z))(c)
+const range=curry((a,z)=>parserOf(inRange(a,z).expect)(c=>satisfy(inRange(a,z))(c)))
 const digit=satisfy(isDigit)
 const lower=satisfy(isLower)
 const upper=satisfy(isUpper)
@@ -139,7 +139,9 @@ const manyTill=curry((p,e)=>parserOf
 const count=curry((n,p)=>parserOf(n+" of "+p.expect)
   (io=>io.snd().length<n?p.then(count(n)(p))(io):Right(io)))
 const between=curry((open,p,close)=>skip(open).then(p).skip(close))
-const option=curry((x,p)=>parserOf("option "+p.expect)(io=>p(io).or(Right(Pair(io.fst(),x)))))
+const option=curry(
+  (x,p)=>parserOf("option "+p.expect)
+  (io=>p(io).or(Right(Pair(io.fst(),x)))))
 const optionMaybe=p=>parserOf("maybe "+p.expect)(io=>p.as(Just)(io).or(Right(Pair(io.fst(),Nothing()))))
 const sepBy=curry((p,sep)=>parserOf(p.expect+" separated by "+sep.expect)
   (io=>p.then(many(skip(sep).then(p)))(io)))//.or(Right(Pair(io.fst(),[]))))
@@ -224,3 +226,4 @@ exports.endBy=endBy
 exports.endBy1=endBy1
 exports.res=res
 exports.parse=parse
+exports.parserOf=parserOf

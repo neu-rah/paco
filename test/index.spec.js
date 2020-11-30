@@ -22,13 +22,13 @@ patchPrimitives(
 )
 
 const {
-  anyChar,char,oneOf,noneOf,range,satisfy,boot,skip,
+  anyChar,char,oneOf,noneOf,range,satisfy,skip,
   digit,lower,upper,letter,alphaNum,hexDigit,octDigit,
   space,tab,nl,cr,blank,
   digits,spaces,blanks,spaces1,blanks1,eof,
   string,regex,many,many1,optional,
   choice,count,between,option,optionMaybe,sepBy,endBy,endBy1,
-  parse,
+  parse,none,
 }=require("../paco.js")
 
 ///////////////////////////////////////////
@@ -36,7 +36,7 @@ const {
 describe("Parser",function() {
   it("parser `none` and utilities",async ()=>{
     assert.deepStrictEqual(none(Pair("",[])),Right(Pair("",[])),"parser boot, always succeeds, no consume initial parser state")
-    assert.deepStrictEqual(parse(">")(boot())(""),Right([]),"`parse` function")
+    assert.deepStrictEqual(parse(">")(none())(""),Right([]),"`parse` function")
     assert.deepStrictEqual(parse(">")(char('x'))("x"),Right(["x"]),"char('x')")
     assert(isLeft(parse(">")(char('x'))("")),"eof fail")
   })
