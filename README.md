@@ -9,7 +9,7 @@ const p=
   .skip(char('-'))
   .then(digits.join("").as(o=>o*1))
 
-parse(p)("#AN-123")
+parse(">")(p)("#AN-123")
 ```
 > _note: `parseInt` could have been used in place of `o=>o*1`_
 
@@ -101,13 +101,13 @@ the only difference is that this last one, as the first will give full output, i
 this parse will fail as it expects at least one digit
 
 ```javascript
-#>parse(many1(digit))("#123")
+#>parse(">")(many1(digit))("#123")
 TC_Left { value: 'error, expecting digit but found `#` here->#123' }
 ```
 ## Composition examples
 
 ```javascript
-  parse( 
+  parse(">")( 
     many(
       many1(digit.or(letter)).join()
       .skip(spaces)
@@ -131,7 +131,7 @@ const nr=
     .then(digits.join("").as(o=>o*1))
   )).as(foldr1(a=>b=>a+b))//transform output by summing all values
 
-  parse(nr)(" 123 , 25 | 3")
+  parse(">")(nr)(" 123 , 25 | 3")
 ```
 
 expected result
@@ -192,7 +192,7 @@ TC_Right { value: [ 151 ] }
 - **regex(expr)** match with regex expression
 
 ```javascript
-#>parse(regex("#([a-zA-Z]+)[ -]([0-9]+)"))("#an-123...")
+#>parse(">")(regex("#([a-zA-Z]+)[ -]([0-9]+)"))("#an-123...")
 TC_Right { value: [ 'an', '123' ] }
 ```
 
@@ -212,18 +212,18 @@ TC_Right { value: [ 'an', '123' ] }
 Be sure to exclude the delimiters from the content or provide any other meaning of content end
 
 ```javascript
-#>parse(between(space)(many1(noneOf(" ")))(space).join())(" ab.12 ")
+#>parse(">")(between(space)(many1(noneOf(" ")))(space).join())(" ab.12 ")
 TC_Right { value: [ 'ab.12' ] }
 ```
 
 - **option(x)(p)** parses `p` or returns `x` if it fails, this parser never fails.
 
 ```javascript
-#>parse(option(["0"])(digit))("1")
+#>parse(">")(option(["0"])(digit))("1")
 TC_Right { value: [ '1' ] }
-#>parse(option(["0"])(digit))("")
+#>parse(">")(option(["0"])(digit))("")
 TC_Right { value: [ '0' ] }
-#>parse(option(["0"])(digit))("#")
+#>parse(">")(option(["0"])(digit))("#")
 TC_Right { value: [ '0' ] }
 ```
 
@@ -288,8 +288,8 @@ TC_Left { value: TC_Pair { a: '#123', b: 'letter or digit' } }
 process a parser return to produce a result or error message, discarding input state description.
 
 ```javascript
-#>res(letter.then(digits).parse("123"))
-TC_Left { value: 'error, expecting letter but found `1` here->1...' }
+#>res(">")(letter.then(digits).parse("123"))
+TC_Left { value: '>error, expecting letter but found `1` here->1...' }
 ```
 without `res()` procesing
 ```javascript
@@ -320,7 +320,7 @@ const p=
   .skip(char('-').or(spaces1))
   .then(digits.join().as(parseInt))
 
-console.log(parse(p)("#AN-123"))
+console.log(parse(">")(p)("#AN-123"))
 ```
 result:
 ```javascript
