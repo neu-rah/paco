@@ -57,7 +57,7 @@ const parserOf=curry((e,o)=>{
     (io=>{
       const os=o(io)
       const ps=os.mbind(p)
-      return isLeft(ps)?os:Left(Pair(io.fst(),o.notFollowedBy(p).expect))
+      return isLeft(ps)?os:Left(Pair(io.fst(),new Expect(o.notFollowedBy(p).expect)))
     })
   o.onFailMsg=msg=>parserOf(msg)(io=>o(io).or(Left(Pair(io.fst(),new Error(msg)))))
   o.or=p=>parserOf(o.expect+" or "+p.expect)//using alternative <|>
