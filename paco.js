@@ -6,6 +6,7 @@ const {StringStream}=require("./src/strstr.js")
 
 const {
   patchPrimitives,//patch primitive data types
+  curry,//js curry style
   id,fcomp,fchain,constant,flip,cons,//Functional
   empty,append,mconcat,//Monoid
   head,tail,//List
@@ -35,17 +36,17 @@ const {
 const prim=require("./src/primitives")
 
 //recursively extends the parser continuations (.then, .skip, .or, ...)
-const parserOf=e=>o=>{
+const parserOf=curry((e,o)=>{
   o.parse=s=>o(Pair(s,[]))
   o.post=f=>parserOf
     (o.expect+" verify of "+f)
     (io=>f(o(io)))
-  o.chk=m=>f=>parserOf(o.expect+" check of "+f)
+  o.chk=curry((m,f)=>parserOf(o.expect+" check of "+f)
     (io=>{
       const r=o.onFailMsg(m)(io)
       if(isLeft(r)||f(fromRight(r).snd())) return r
       return Left(Pair(io.fst(),new Error(m)))
-    })
+    }))
   o.then=p=>parserOf(o.expect+"\nthen "+p.expect)(io=>io.mbind(o).mbind(p))
   o.skip=p=>parserOf(o.expect+"\nskip "+p.expect)(io=>{
     const os=io.mbind(o)
@@ -70,7 +71,7 @@ const parserOf=e=>o=>{
     (io=>typeof p==="undefined"?o.as(mconcat)(io):o.as(o=>o.join(p))(io))
   o.expect=e
   return (self=>o)(o)
-}
+})
 
 // Combinators --------------
 //an "id" combinator to apply continuations on root elements
@@ -128,17 +129,17 @@ const optional=p=>parserOf("optional "+p.expect)(io=>p(io).or(Right(io)))
 const choice=ps=>foldl1(a=>b=>a.or(b))(ps)
 const many=p=>parserOf("many("+p.expect+")")(io=>p.then(many(p))(io).or(Right(io)))
 const many1=p=>parserOf("at least one "+p.expect)(p.then(many(p)))
-const count=n=>p=>parserOf(n+" of "+p.expect)
-  (io=>io.snd().length<n?p.then(count(n)(p))(io):Right(io))
-const between=open=>p=>close=>skip(open).then(p).skip(close)
-const option=x=>p=>parserOf("option "+p.expect)(io=>p(io).or(Right(Pair(io.fst(),x))))
+const count=curry((n,p)=>parserOf(n+" of "+p.expect)
+  (io=>io.snd().length<n?p.then(count(n)(p))(io):Right(io)))
+const between=curry((open,p,close)=>skip(open).then(p).skip(close))
+const option=curry((x,p)=>parserOf("option "+p.expect)(io=>p(io).or(Right(Pair(io.fst(),x)))))
 const optionMaybe=p=>parserOf("maybe "+p.expect)(io=>p.as(Just)(io).or(Right(Pair(io.fst(),Nothing()))))
-const sepBy=p=>sep=>parserOf(p.expect+" separated by "+sep.expect)
+const sepBy=curry((p,sep)=>parserOf(p.expect+" separated by "+sep.expect))
   (io=>p.then(many(skip(sep).then(p)))(io))//.or(Right(Pair(io.fst(),[]))))
-const sepBy1=p=>sep=>parserOf(p.expect+" separated by "+sep.expect)
+const sepBy1=curry((p,sep)=>parserOf(p.expect+" separated by "+sep.expect))
 (io=>p.then(many(skip(sep).then(p)))(io))
-const endBy=p=>sep=>end=>sepBy(p)(sep).then(skip(end))
-const endBy1=p=>sep=>end=>sepBy1(p)(sep).then(skip(end))
+const endBy=curry((p,sep,end)=>sepBy(p)(sep).then(skip(end)))
+const endBy1=curry((p,sep,end)=>sepBy1(p)(sep).then(skip(end)))
 
 //high order character parser
 const spaces=many(space);spaces.expect="spaces"
@@ -148,7 +149,7 @@ const blanks1=many1(blank);blanks1.expect="some white space"
 const digits=many(digit);digits.expect="digits"
 
 //interpret a result and enventually build an error message
-const res=fn=>r=>{
+const res=curry((fn,r)=>{
   if(isRight(r)) return r.map(snd)
   else {
     const rr=fromLeft(r)
@@ -167,9 +168,9 @@ const res=fn=>r=>{
         +(found?" here->"+found.toString().substr(0,10)+"...":"")
       )
   }
-}
+})
 
-const parse=fn=>p=>str=>res(fn)(p(Pair(str,[])))
+const parse=curry((fn,p,str)=>res(fn)(p(Pair(str,[]))))
 
 exports.satisfy=satisfy
 exports.anyChar=anyChar
