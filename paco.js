@@ -75,10 +75,14 @@ const parserOf=curry((e,o)=>{
 
 // Combinators --------------
 //an "id" combinator to apply continuations on root elements
-const boot=()=>parserOf("")(fcomp(Right)(id))
+// const boot=()=>parserOf("")(fcomp(Right)(id))
+// deprecated use `none` parser
 
-//apply skip (continuation) to the root element, using `boot` combinator
-const skip=o=>parserOf("skip "+o.expect)(io=>boot().skip(o)(io))
+//parser always succeedes without consuming
+const none=parserOf("none")(fcomp(Right)(id))
+
+//apply skip (continuation) to the root element, using `none` combinator
+const skip=o=>parserOf("skip "+o.expect)(io=>none.skip(o)(io))
 
 //check a character with a boolean function
 const satisfy=chk=>parserOf(chk.expect||"to satisfy condition")(io=>{
@@ -117,10 +121,10 @@ const letter=satisfy(isLetter)
 const alphaNum=satisfy(isAlphaNum)
 const hexDigit=satisfy(isHexDigit)
 const octDigit=satisfy(isOctDigit)
-const space=satisfy(isSpace)
-const tab=satisfy(isTab)
-const nl=satisfy(is_nl)
-const cr=satisfy(is_cr)
+const space=satisfy(isSpace);space.expect="sapce"
+const tab=satisfy(isTab);tab.expect="tab"
+const nl=satisfy(is_nl);nl.expect="new-line"
+const cr=satisfy(is_cr);cr.expect="carryage return"
 const blank=satisfy(isBlank)
 const eof=satisfy(isEof)
 
@@ -134,15 +138,15 @@ const count=curry((n,p)=>parserOf(n+" of "+p.expect)
 const between=curry((open,p,close)=>skip(open).then(p).skip(close))
 const option=curry((x,p)=>parserOf("option "+p.expect)(io=>p(io).or(Right(Pair(io.fst(),x)))))
 const optionMaybe=p=>parserOf("maybe "+p.expect)(io=>p.as(Just)(io).or(Right(Pair(io.fst(),Nothing()))))
-const sepBy=curry((p,sep)=>parserOf(p.expect+" separated by "+sep.expect))
-  (io=>p.then(many(skip(sep).then(p)))(io))//.or(Right(Pair(io.fst(),[]))))
-const sepBy1=curry((p,sep)=>parserOf(p.expect+" separated by "+sep.expect))
-(io=>p.then(many(skip(sep).then(p)))(io))
+const sepBy=curry((p,sep)=>parserOf(p.expect+" separated by "+sep.expect)
+  (io=>p.then(many(skip(sep).then(p)))(io)))//.or(Right(Pair(io.fst(),[]))))
+const sepBy1=curry((p,sep)=>parserOf(p.expect+" separated by "+sep.expect)
+  (io=>p.then(many(skip(sep).then(p)))(io)))
 const endBy=curry((p,sep,end)=>sepBy(p)(sep).then(skip(end)))
 const endBy1=curry((p,sep,end)=>sepBy1(p)(sep).then(skip(end)))
 
 //high order character parser
-const spaces=many(space);spaces.expect="spaces"
+const spaces=many(space);spaces.expect="spaces"//TODO: this expect adjoin is not working
 const blanks=many(blank);blanks.expect="white space"
 const spaces1=many1(space);spaces1.expect="at least one space"
 const blanks1=many1(blank);blanks1.expect="some white space"
@@ -160,12 +164,13 @@ const res=curry((fn,r)=>{
       fpos+=":"+pos.join(":")+"\n"
     }
     const found=head(rr.fst())//the char to blame
+    clog("found:",found)
     return rr.snd().isError()?
       Left(fpos+"error, "+rr.snd()):
       Left(
         fpos+"error, expecting "+rr.snd()
         +" but found `"+(found||"eof")+"`"
-        +(found?" here->"+found.toString().substr(0,10)+"...":"")
+        +(found?" here->"+rr.fst().toString().substr(0,10)+"...":"")//TODO: this is expensive, refactor! (functional `take n`)
       )
   }
 })
@@ -199,7 +204,7 @@ exports.eof=eof
 exports.string=string
 exports.regex=regex
 
-exports.boot=boot
+exports.none=none
 exports.skip=skip
 exports.many=many
 exports.many1=many1

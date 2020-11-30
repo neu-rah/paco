@@ -64,7 +64,9 @@ all transformation definitions should be applyed to the parser and not to the re
 
 a parser can be stored, combined, passed around and perform parsing on many contents many times, all transitory state is kept outside.
 
-Untill now, all failing parsers do not consume... lets see...
+## try and consume
+
+Untill now, all failing parsers do not consume... lets see... while so, no need to inplement **try*
 
 ## Still missing
 
@@ -237,11 +239,13 @@ TC_Right { value: [ '0' ] }
 
 - **endBy1(p)(sep)(end)** parses one or more ocourences of `p` separated by `sep` droping the separators and terminating with `end`
 
-- **boot()** non-consume happy parser. _you should not need this_
+- **none** non-consume happy parser.
 
-> boot is an identity parser, will just output the given input as a successful parse. So it never fails or consumes.  
-We use it to turn binary combinators into unary metaparsers. That is the case of `.skip(...)`, it uses the `boot()` parser to be available as a unary modifier `skip()`.  
-`boot()` can do so for any binary combinator.  
+> none is an identity parser, will just output the given input as a successful parse. So it never fails or consumes.  
+We use it to turn binary combinators into unary metaparsers. That is the case of `.skip(...)`, it uses the `none` parser to be available as a unary modifier `skip()`.  
+`none` can do so for any binary combinator and can apear where you want to disable a part.  
+
+> using `none` as `sep` with `endBy(p,sep,end)` whill silentrly skip the `sep` need.
 
 ```haskell
 Right . id

@@ -34,8 +34,8 @@ const {
 ///////////////////////////////////////////
 // test stuff
 describe("Parser",function() {
-  it("parser boot and utilities",async ()=>{
-    assert.deepStrictEqual(boot()(Pair("",[])),Right(Pair("",[])),"parser boot, always succeeds, no consume initial parser state")
+  it("parser `none` and utilities",async ()=>{
+    assert.deepStrictEqual(none(Pair("",[])),Right(Pair("",[])),"parser boot, always succeeds, no consume initial parser state")
     assert.deepStrictEqual(parse(">")(boot())(""),Right([]),"`parse` function")
     assert.deepStrictEqual(parse(">")(char('x'))("x"),Right(["x"]),"char('x')")
     assert(isLeft(parse(">")(char('x'))("")),"eof fail")

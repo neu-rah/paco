@@ -13,7 +13,7 @@ const isDigit=chkOf("digit")(inRange('0','9'))
 const isLower=chkOf("lower letter")(inRange('a','z'))
 const isUpper=chkOf("upper letter")(inRange('A','Z'))
 const isLetter=chkOf("letter")(o=>isLower(o)||isUpper(o))
-const isEof=chkOf("eof")(o=>typeof i==="undefined")
+const isEof=chkOf("eof")(o=>typeof o==="undefined")
 
 exports.isAnyChar=isAnyChar
 exports.isChar=isChar
