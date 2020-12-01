@@ -52,6 +52,18 @@ const parserOf=curry((e,o)=>{
     const os=io.mbind(o)
     return os.mbind(p).map(map(o=>snd(fromRight(os)))).when(os)
   })
+  o.lookAhead=p=>parserOf(o.expect+" when look ahead for "+p.expect)
+    (io=>{
+      const ps=p(io)
+      if (isLeft(ps)) return ps
+      return o(io)
+    })
+  o.excluding=p=>parserOf(o.expect+" excluding "+p.expect)
+    (io=>{
+      const ps=p(io)
+      if (isRight(ps)) return Left(Pair(io.fst(),new Expect(o.excluding(p).expect)))
+      return o(io)
+    })
   o.notFollowedBy=p=>parserOf
     (o.expect+" bot followed by "+p.expect)
     (io=>{
@@ -66,7 +78,7 @@ const parserOf=curry((e,o)=>{
       if(isRight(r)) return r;
       return r.or(p(io)).or(Left(Pair(io.fst(),new Expect(o.or(p).expect))))
     })
-  const xfname=f=>{
+  const xfname=f=>{//aux
     const ff=f.name||f.toString()
     return ff.length<15?ff:ff.substr(0,12)+"..."
   }
