@@ -41,13 +41,20 @@ parser succeeds only if `p` fails
 
 ## .lookAhead(p)
 
-predicated `p` with no sonsume before parsing, if `p` fails the parsing will fail
+predicated `p` with no consume before parsing, if `p` fails the parsing will fail
 
 ## .excluding(p)
 
 predicated `p` before parsing, if `p` succeedes the parsing will fail
 
 _this could be achieved by grouping parsers instead of separate them, but some grammars are writen so_
+
+**must apply to same level parser**. using `.excluding(char(..))` at character level on a string level parser will have no effect
+
+```javascript
+digits.excluding(oneOf("89"))//this will have no effect
+many(digit.excluding(oneOf("89")))//but this will
+```
 
 ## .as
 Parse output can be formated with `.as`, it will apply to the parser or group where inserted. `.as` will accept an output transformer function.
