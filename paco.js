@@ -30,7 +30,8 @@ patchPrimitives(
 const {
   isAnyChar,isChar,isOneOf,isNoneOf,inRange,
   isDigit,isLower,isUpper,isLetter,isAlphaNum,isHexDigit,isOctDigit,
-  isSpace,isTab,is_nl,is_cr,isBlank,isEof
+  isSpace,isTab,is_nl,is_cr,isBlank,isEof,
+  Point,Set,Range,
 }=require("./src/primitives")
 
 const prim=require("./src/primitives")
@@ -47,7 +48,8 @@ const parserOf=curry((e,o)=>{
       if(isLeft(r)||f(fromRight(r).snd())) return r
       return Left(Pair(io.fst(),new Error(m)))
     }))
-  o.then=p=>parserOf(o.expect+"\nthen "+p.expect)(io=>io.mbind(o).mbind(p))
+  o._then=p=>parserOf(o.expect+"\nthen "+p.expect)(io=>io.mbind(o).mbind(p))
+  o.then=p=>typeof p==="string"?(p.length===1?o.then(char(p)):o.then(string(p))):o._then(p)
   o.skip=p=>parserOf(o.expect+"\nskip "+p.expect)(io=>{
     const os=io.mbind(o)
     return os.mbind(p).map(map(o=>snd(fromRight(os)))).when(os)
