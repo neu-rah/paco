@@ -49,20 +49,6 @@ describe("Parser",function() {
     assert(isLeft(parse(">")(char('x'))("")),"eof fail")
   })
 })
-describe("Primitives",function() {
-  it("domain Any",async ()=>{
-    assert(isAnyChar.exclude(isEof).domain.constructor===Any,"exclude eof")
-    assert(isAnyChar.exclude(isNotEof).domain.constructor===Any,"exclude not eof")
-    assert(isAnyChar.exclude(isNone).domain.constructor===Any,"exclude none")
-    assert(isAnyChar.exclude(isAnyChar).domain.constructor===None,"exclude none")
-    assert.deepStrictEqual(isAnyChar.exclude(isChar('a')).domain,isNoneOf('a').domain,"exclude char")
-    assert.deepStrictEqual(isAnyChar.exclude(inRange('a','z')).domain,notInRange('a','z').domain,"exclude range")
-    assert.deepStrictEqual(isAnyChar.exclude(notInRange('a','z')).domain,inRange('a','z').domain,"exclude not in range")
-    assert.deepStrictEqual(isAnyChar.exclude(isGreater('o')).domain,isLess(prev('o')).domain,"exclude greater")
-    assert.deepStrictEqual(isAnyChar.exclude(isLess('o')).domain,isGreater(next('o')).domain,"exclude less")
-    assert.deepStrictEqual(isAnyChar.exclude(isOneOf('o')).domain,isNone.domain,"exclude oneOf")
-  })
-})
 
 describe("Character parsers",function() {
   it("satisfy",async ()=>{

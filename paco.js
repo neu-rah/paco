@@ -203,6 +203,8 @@ const res=curry((fn,r)=>{
 
 const parse=curry((fn,p,str)=>res(fn)(p(Pair(str,[]))))
 
+if(!exports) var exports={}
+
 exports.satisfy=satisfy
 exports.anyChar=anyChar
 exports.char=char
