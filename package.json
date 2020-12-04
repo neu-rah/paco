@@ -1,6 +1,6 @@
 {
   "name": "paco",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "Monadic Parser Combinators",
   "main": "paco.js",
   "scripts": {
@@ -15,6 +15,10 @@
   },
   "devDependencies": {
     "nyc": "^15.1.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/neu-rah/paco.git"
   },
   "keywords": [
     "Monadic",
