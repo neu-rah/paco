@@ -123,7 +123,6 @@ const string=str=>parserOf("string `"+str+"`")
 //regex match
 const regex=e=>parserOf("regex /"+e+"/")
 (io=>{
-  clog(io.fst(),e,io.fst().match(e).length)
   const r=io.fst().match(e)
   return r===null?
     Left(Pair(io.fst(),new Expect(regex(e).expect))):
