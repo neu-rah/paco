@@ -1,0 +1,17 @@
+{
+  "name": "json-paco",
+  "version": "1.0.0",
+  "description": "paco example, json parser",
+  "main": "json-paco.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "json",
+    "parser",
+    "paco",
+    "example"
+  ],
+  "author": "neu-rah",
+  "license": "MIT"
+}

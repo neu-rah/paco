@@ -2,7 +2,7 @@
 
 const { log, clog, xlog, debuging } = require("./src/debug")
 const { Msg, Expect, Error } = require("./src/error")
-const { StringStream } = require("./src/strstr.js")
+const { SStr } = require("./src/strstr.js")
 
 const {
   patchPrimitives,//patch primitive data types
@@ -40,6 +40,7 @@ const quickParam = p => typeof p === "string" ? (p.length === 1 ? char(p) : stri
 
 //recursively extends the parser continuations (.then, .skip, .or, ...)
 const parserOf = curry((e, o) => {
+  clog("parserOf",e)
   o.parse = s => o()(Pair(s, []))
   o.post=f=>parserOf
     (o.expect+" verify of "+f)
@@ -80,7 +81,7 @@ const parserOf = curry((e, o) => {
       const ps = os.mbind(p(ex))
       return isLeft(ps) ? os : Left(Pair(io.fst(), new Expect(o.notFollowedBy(p).expect)))
     })
-  o.onFailMsg = msg => parserOf(msg)(ex => io => o(io).or(Left(Pair(io.fst(), new Error(msg)))))
+  o.onFailMsg = msg => parserOf(msg)(ex => io => o(ex)(io).or(Left(Pair(io.fst(), new Error(msg)))))
   o.or = p => parserOf(o.expect + " or " + p.expect)//using alternative <|>
     (ex => io => {
       const r = o(ex)(io)
@@ -196,10 +197,10 @@ const option = curry(
 const optionMaybe = p => parserOf("maybe " + p.expect)(ex => io => p.as(Just)(io).or(Right(Pair(io.fst(), Nothing()))))
 
 const sepBy = curry((p, sep) => parserOf(p.expect + " separated by " + sep.expect)
-  (ex => io => p.then(many(skip(sep).then(p)))(io)))//.or(Right(Pair(io.fst(),[]))))
+  (ex => io => p.then(many(skip(sep).then(p)))(ex)(io)))//.or(Right(Pair(io.fst(),[]))))
 
 const sepBy1 = curry((p, sep) => parserOf(p.expect + " separated by " + sep.expect)
-  (ex => io => p.then(many(skip(sep).then(p)))(io)))
+  (ex => io => p.then(many(skip(sep).then(p)))(ex)(io)))
 
 const endBy = curry((p, sep, end) => sepBy(p)(sep).then(skip(end)))
 
@@ -216,6 +217,7 @@ const digits = many(digit); digits.expect = "digits"
 const res = curry((fn, r) => {
   if (isRight(r)) return r.map(snd)
   else {
+    // fn=typeof fn==="undefined"?">":fn
     const rr = fromLeft(r)
     var fpos = fn
     if (typeof rr.fst().line !== "undefined") {
@@ -282,3 +284,5 @@ exports.endBy1 = endBy1
 exports.res = res
 exports.parse = parse
 exports.parserOf = parserOf
+exports.Pair=Pair
+exports.SStr=SStr

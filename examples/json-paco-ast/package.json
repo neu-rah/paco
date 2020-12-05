@@ -1,0 +1,17 @@
+{
+  "name": "json-paco-ast",
+  "version": "1.0.0",
+  "description": "JSON PaCo parser to AST",
+  "main": "json-paco-ast",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "json",
+    "paco",
+    "parser",
+    "ast"
+  ],
+  "author": "neu-rah",
+  "license": "MIT"
+}
