@@ -57,7 +57,7 @@ const parserOf = curry((e, o) => {
   o.skip = p => parserOf(o.expect + "\nskip " + p.expect)
     (ex => io => {
       const os = io.mbind(o(p))
-      return os.mbind(p(ex)).map(map(o => snd(fromRight(os)))).when(os)
+      return os.mbind(p(ex)).map(map(o => snd(fromRight(os))))//.when(os)
     })
   
   o.lookAhead = p => parserOf(o.expect + " when look ahead for " + p.expect)
@@ -102,11 +102,9 @@ const parserOf = curry((e, o) => {
 })
 
 // Combinators --------------
-//an "id" combinator to apply continuations on root elements
-// const boot=()=>parserOf("")(fcomp(Right)(id))
-// deprecated use `none` parser
 
 //parser always succeedes without consuming
+// also an "id" combinator to apply continuations on root elements
 const none = parserOf("none")(_=>fcomp(Right)(id))
 
 //apply skip (continuation) to the root element, using `none` combinator
@@ -183,7 +181,6 @@ const many1 = p => parserOf("at least one " + p.expect)(p.then(many(p)))
 
 const manyTill = curry((p, e) => parserOf
   ("many " + p.expect + " until " + e.expect)
-  // (ex => io => skip(e).or(p.then(manyTill(p, e)))()(io)))
   (ex=>io=>p.excluding(e).then(manyTill(p,e))()(io).or(Right(io))))
 
 
@@ -285,12 +282,3 @@ exports.endBy1 = endBy1
 exports.res = res
 exports.parse = parse
 exports.parserOf = parserOf
-
-// const c9=char('9')
-// const t=p=>o=>clog(p.expect+":","'"+o+"'","\n->",p.parse(o))
-
-// t(digit.lookAhead(digit))("12")
-// t(digit.notFollowedBy(digit))("1a")
-// t(digits.join().then(digit))("123x")
-// t(many(char('*')).join().then(string("*/")))("******/")
-// t(skip(letter).then(digit))("a1")

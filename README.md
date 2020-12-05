@@ -28,6 +28,18 @@ Some available metaparsers like `many()`, `many1()`, `skip()` can accept other p
 
 Some parsers are already a composition with metaparsers, that is the case of `digits`, it will perform `many(digit)`.
 
+**It's now possible to parse this:**
+```javascript
+#>digits.join().as(parseInt).then(digit).parse("1234")
+TC_Right { value: TC_Pair { a: '', b: [ 123, '4' ] } }
+```
+
+`.then` and `.skip` inject exclusion parameters on the chain
+
+`many` will peeks this parameters and exclude the sequence match
+
+on the example `digits` is a composed parser, using `many`, nonetheless the parameters traversed the `.join` and `.as` modifiers and were excluded from the match loop.
+
 ---
 ## .then | .skip
 The chaining is done with `.then` or `.skip`, the first combines the output, while the second will drop it.
