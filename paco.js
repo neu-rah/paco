@@ -40,21 +40,26 @@ const quickParam = p => typeof p === "string" ? (p.length === 1 ? char(p) : stri
 
 //recursively extends the parser continuations (.then, .skip, .or, ...)
 const parserOf = curry((e, o) => {
-  o.parse = ex => s => o(ex)(Pair(s, []))
-  // o.post=f=>parserOf
-  //   (o.expect+" verify of "+f)
-  //   (ex=>io=>f(o(io)))
-  // o.chk=curry((m,f)=>parserOf(o.expect+" check of "+f)
-  //   (ex=>io=>{
-  //     const r=o.onFailMsg(m)(io)
-  //     if(isLeft(r)||f(fromRight(r).snd())) return r
-  //     return Left(Pair(io.fst(),new Error(m)))
-  //   }))
-  o.then = qp => (p => parserOf(o.expect + "\nthen " + p.expect)(ex => io => io.mbind(o(p)).mbind(p(ex))))(quickParam(qp))
-  o.skip = p => parserOf(o.expect + "\nskip " + p.expect)(ex => io => {
-    const os = io.mbind(o)
-    return os.mbind(p).map(map(o => snd(fromRight(os)))).when(os)
-  })
+  o.parse = s => o()(Pair(s, []))
+  o.post=f=>parserOf
+    (o.expect+" verify of "+f)
+    (ex=>io=>f(o(io)))
+  o.chk=curry((m,f)=>parserOf(o.expect+" check of "+f)
+    (ex=>io=>{
+      const r=o.onFailMsg(m)(io)
+      if(isLeft(r)||f(fromRight(r).snd())) return r
+      return Left(Pair(io.fst(),new Error(m)))
+    }))
+
+  o.then = qp => (p => parserOf(o.expect + "\nthen " + p.expect)
+    (ex => io => io.mbind(o(p)).mbind(p(ex))))(quickParam(qp))
+
+  o.skip = p => parserOf(o.expect + "\nskip " + p.expect)
+    (ex => io => {
+      const os = io.mbind(o(p))
+      return os.mbind(p(ex)).map(map(o => snd(fromRight(os)))).when(os)
+    })
+  
   o.lookAhead = p => parserOf(o.expect + " when look ahead for " + p.expect)
     (ex => io => {
       const r=o(ex)(io)
@@ -102,10 +107,10 @@ const parserOf = curry((e, o) => {
 // deprecated use `none` parser
 
 //parser always succeedes without consuming
-const none = parserOf("none")(fcomp(Right)(id))
+const none = parserOf("none")(_=>fcomp(Right)(id))
 
 //apply skip (continuation) to the root element, using `none` combinator
-const skip = o => parserOf("skip " + o.expect)(ex => io => none.skip(o)(io))
+const skip = o => parserOf("skip " + o.expect)(ex => io => none.skip(o)(ex)(io))
 
 //check a character with a boolean function
 const satisfy = chk => parserOf(chk.expect || "to satisfy condition")(ex => io => {
@@ -156,7 +161,7 @@ const blank = satisfy(isBlank)
 const eof = satisfy(isEof)
 
 //meta-parsers
-const optional = p => parserOf("optional " + p.expect)(ex => io => p(io).or(Right(io)))
+const optional = p => parserOf("optional " + p.expect)(ex => io => p(ex)(io).or(Right(io)))
 
 const choice = ps => foldl1(a => b => a.or(b))(ps)
 
@@ -183,13 +188,13 @@ const manyTill = curry((p, e) => parserOf
 
 
 const count = curry((n, p) => parserOf(n + " of " + p.expect)
-  (ex => io => io.snd().length < n ? p.then(count(n)(p))(io) : Right(io)))
+  (ex => io => io.snd().length < n ? p.then(count(n)(p))(ex)(io) : Right(io)))
 
 const between = curry((open, p, close) => skip(open).then(p).skip(close))
 
 const option = curry(
-  (x, p) => parserOf("option " + p.expect)
-    (ex => io => p(io).or(Right(Pair(io.fst(), x)))))
+  (x, p) => parserOf("option " + p.expect+" else "+x)
+    (ex => io => p(ex)(io).or(Right(Pair(io.fst(), x)))))
 
 const optionMaybe = p => parserOf("maybe " + p.expect)(ex => io => p.as(Just)(io).or(Right(Pair(io.fst(), Nothing()))))
 
@@ -281,11 +286,11 @@ exports.res = res
 exports.parse = parse
 exports.parserOf = parserOf
 
-const c9=char('9')
-
-const t=p=>o=>clog(p.expect+":","'"+o+"'","\n->",p.parse()(o))
+// const c9=char('9')
+// const t=p=>o=>clog(p.expect+":","'"+o+"'","\n->",p.parse(o))
 
 // t(digit.lookAhead(digit))("12")
 // t(digit.notFollowedBy(digit))("1a")
-t(digits.join().then(digit))("123x")
-t(many(char('*')).join().then(string("*/")))("******/")
+// t(digits.join().then(digit))("123x")
+// t(many(char('*')).join().then(string("*/")))("******/")
+// t(skip(letter).then(digit))("a1")
