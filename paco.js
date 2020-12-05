@@ -50,17 +50,18 @@ const parserOf = curry((e, o) => {
   //     if(isLeft(r)||f(fromRight(r).snd())) return r
   //     return Left(Pair(io.fst(),new Error(m)))
   //   }))
-  o.then = qp => (p => parserOf(o.expect + "\nthen " + p.expect)(ex => io => io.mbind(o(ex)).mbind(p(ex))))(quickParam(qp))
+  o.then = qp => (p => parserOf(o.expect + "\nthen " + p.expect)(ex => io => io.mbind(o(p)).mbind(p(ex))))(quickParam(qp))
   o.skip = p => parserOf(o.expect + "\nskip " + p.expect)(ex => io => {
     const os = io.mbind(o)
     return os.mbind(p).map(map(o => snd(fromRight(os)))).when(os)
   })
-  // o.lookAhead = p => parserOf(o.expect + " when look ahead for " + p.expect)
-  //   (ex => io => {
-  //     const ps = p(io)
-  //     if (isLeft(ps)) return ps
-  //     return o(io)
-  //   })
+  o.lookAhead = p => parserOf(o.expect + " when look ahead for " + p.expect)
+    (ex => io => {
+      const r=o(ex)(io)
+      const ps = r.mbind(p())
+      if (isLeft(ps)) return ps
+      return r
+    })
   o.excluding = p => parserOf(o.expect + " excluding " + p.expect)
     (ex => io => {
       const ps = p(ex)(io)
@@ -68,10 +69,10 @@ const parserOf = curry((e, o) => {
       return o(ex)(io)
     })
   o.notFollowedBy = p => parserOf
-    (o.expect + " bot followed by " + p.expect)
+    (o.expect + " not followed by " + p.expect)
     (ex => io => {
-      const os = o(io)
-      const ps = os.mbind(p)
+      const os = o(ex)(io)
+      const ps = os.mbind(p(ex))
       return isLeft(ps) ? os : Left(Pair(io.fst(), new Expect(o.notFollowedBy(p).expect)))
     })
   o.onFailMsg = msg => parserOf(msg)(ex => io => o(io).or(Left(Pair(io.fst(), new Error(msg)))))
@@ -87,10 +88,10 @@ const parserOf = curry((e, o) => {
   }
   o.as = f => parserOf
     ("(" + o.expect + ")->as(" + xfname(f) + ")")
-    (ex => io => Pair(io.fst(), []).mbind(o).map(map(f)).map(map(x => io.snd().append(x))))
+    (ex => io => Pair(io.fst(), []).mbind(o(ex)).map(map(f)).map(map(x => io.snd().append(x))))
   o.join = p => parserOf
     (typeof p === "undefined" ? "(" + o.expect + ")->join()" : "(" + o.expect + ")->join(\"" + p + "\")")
-    (ex => io => typeof p === "undefined" ? o.as(mconcat)(io) : o.as(o => o.join(p))(io))
+    (ex => io => typeof p === "undefined" ? o.as(mconcat)(ex)(io) : o.as(o => o.join(p))(ex)(io))
   o.expect = e
   return (self => o)(o)
 })
@@ -108,7 +109,6 @@ const skip = o => parserOf("skip " + o.expect)(ex => io => none.skip(o)(io))
 
 //check a character with a boolean function
 const satisfy = chk => parserOf(chk.expect || "to satisfy condition")(ex => io => {
-  // clog("satisfy",chk.expect)
   return chk(head(io.fst())) ?
     Right(//success...
       Pair(//build a pair of remaining input and composed output
@@ -135,8 +135,6 @@ const regex = e => parserOf("regex /" + e + "/")
       )
   })
 
-// clog(regex("[a-z]*").parse("ok"))
-
 //character parsers
 const anyChar = satisfy(isAnyChar)
 const char = c => satisfy(isChar(c))
@@ -162,15 +160,27 @@ const optional = p => parserOf("optional " + p.expect)(ex => io => p(io).or(Righ
 
 const choice = ps => foldl1(a => b => a.or(b))(ps)
 
+//TODO, this is NOT manyTill, we gota mix in the lookAhead for cases
+// like: didits.then(digit)
 const many = 
-  p => parserOf("many(" + p.expect + ")")
-  (ex => io => p.then(ex?manyTill(p,ex):many(p))(ex)(io).or(Right(io)))
+  p => parserOf("many("+p.expect+")")
+  (ex => io => {
+    if(ex) {
+      return many(
+        parserOf(p.expect+" but "+ex.expect)
+        (_=>i=>p.excluding(ex)()(i).or(p.lookAhead(ex)()(i)))
+      )()(io)
+    }
+    return p.then(many(p))(ex)(io).or(Right(io))
+  })
 
 const many1 = p => parserOf("at least one " + p.expect)(p.then(many(p)))
 
 const manyTill = curry((p, e) => parserOf
   ("many " + p.expect + " until " + e.expect)
-  (ex => io => skip(e).or(p.then(manyTill(p, e)))()(io)))
+  // (ex => io => skip(e).or(p.then(manyTill(p, e)))()(io)))
+  (ex=>io=>p.excluding(e).then(manyTill(p,e))()(io).or(Right(io))))
+
 
 const count = curry((n, p) => parserOf(n + " of " + p.expect)
   (ex => io => io.snd().length < n ? p.then(count(n)(p))(io) : Right(io)))
@@ -206,13 +216,11 @@ const res = curry((fn, r) => {
   else {
     const rr = fromLeft(r)
     var fpos = fn
-    // clog("error obj:",r,"rr",rr)
     if (typeof rr.fst().line !== "undefined") {
       const pos = rr.fst().getPos()
       fpos += ":" + pos.join(":") + "\n"
     }
     const found = head(rr.fst())//the char to blame
-    clog("found:", found)
     return rr.snd().isError() ?
       Left(fpos + "error, " + rr.snd()) :
       Left(
@@ -273,7 +281,11 @@ exports.res = res
 exports.parse = parse
 exports.parserOf = parserOf
 
-// clog(digit.then(digit).parse()("123"))
-// clog(digit.excluding(char('9'))()(Pair("123",[])))
-// clog(digits.parse(char('9'))("12391"))
-manyTill(digit,char('9')).parse()("123")
+const c9=char('9')
+
+const t=p=>o=>clog(p.expect+":","'"+o+"'","\n->",p.parse()(o))
+
+// t(digit.lookAhead(digit))("12")
+// t(digit.notFollowedBy(digit))("1a")
+t(digits.join().then(digit))("123x")
+t(many(char('*')).join().then(string("*/")))("******/")
