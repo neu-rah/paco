@@ -38,69 +38,142 @@ const prim = require("./src/primitives")
 
 const quickParam = p => typeof p === "string" ? (p.length === 1 ? char(p) : string(p)) : p
 
-//recursively extends the parser continuations (.then, .skip, .or, ...)
-const parserOf = curry((e, o) => {
-  clog("parserOf",e)
-  o.parse = s => o()(Pair(s, []))
-  o.post=f=>parserOf
-    (o.expect+" verify of "+f)
-    (ex=>io=>f(o(io)))
-  o.chk=curry((m,f)=>parserOf(o.expect+" check of "+f)
+const parserOf=e=>(f,c)=>{
+  Object.setPrototypeOf(f,c?c(e,f):new Parser(e,f))
+  return f
+}
+
+class Parser {
+  constructor(e,f) {
+    clog("Parser::Parser")
+    this.expect=e
+    this.parser=f
+  }
+  parse(s) {return  this()(Pair(s, []))}
+  post(f) {return parserOf
+    (this.expect+" verify of "+f)
+    (ex=>io=>f(this(io)))}
+  chk(m,f) {return parserOf(this.expect+" check of "+f)
     (ex=>io=>{
-      const r=o.onFailMsg(m)(io)
+      const r=this.onFailMsg(m)(io)
       if(isLeft(r)||f(fromRight(r).snd())) return r
       return Left(Pair(io.fst(),new Error(m)))
-    }))
+    })}
 
-  o.then = qp => (p => parserOf(o.expect + "\nthen " + p.expect)
-    (ex => io => io.mbind(o(p)).mbind(p(ex))))(quickParam(qp))
+  then(qp) {return  (p => parserOf(this.expect + "\nthen " + p.expect)
+    (ex => io => io.mbind(this(p)).mbind(p(ex))))(quickParam(qp))}
 
-  o.skip = p => parserOf(o.expect + "\nskip " + p.expect)
+  skip(p) {return  parserOf(this.expect + "\nskip " + p.expect)
     (ex => io => {
-      const os = io.mbind(o(p))
+      const os = io.mbind(this(p))
       return os.mbind(p(ex)).map(map(o => snd(fromRight(os))))//.when(os)
-    })
+    })}
   
-  o.lookAhead = p => parserOf(o.expect + " when look ahead for " + p.expect)
+  lookAhead(p) {return  parserOf(this.expect + " when look ahead for " + p.expect)
     (ex => io => {
-      const r=o(ex)(io)
+      const r=this(ex)(io)
       const ps = r.mbind(p())
       if (isLeft(ps)) return ps
       return r
-    })
-  o.excluding = p => parserOf(o.expect + " excluding " + p.expect)
+    })}
+  excluding(p) {return  parserOf(this.expect + " excluding " + p.expect)
     (ex => io => {
       const ps = p(ex)(io)
-      if (isRight(ps)) return Left(Pair(io.fst(), new Expect(o.excluding(p).expect)))
-      return o(ex)(io)
-    })
-  o.notFollowedBy = p => parserOf
-    (o.expect + " not followed by " + p.expect)
+      if (isRight(ps)) return Left(Pair(io.fst(), new Expect(this.excluding(p).expect)))
+      return this(ex)(io)
+    })}
+  notFollowedBy(p) {return  parserOf
+    (this.expect + " not followed by " + p.expect)
     (ex => io => {
-      const os = o(ex)(io)
+      const os = this(ex)(io)
       const ps = os.mbind(p(ex))
-      return isLeft(ps) ? os : Left(Pair(io.fst(), new Expect(o.notFollowedBy(p).expect)))
-    })
-  o.onFailMsg = msg => parserOf(msg)(ex => io => o(ex)(io).or(Left(Pair(io.fst(), new Error(msg)))))
-  o.or = p => parserOf(o.expect + " or " + p.expect)//using alternative <|>
+      return isLeft(ps) ? os : Left(Pair(io.fst(), new Expect(this.notFollowedBy(p).expect)))
+    })}
+  onFailMsg(msg) {return  parserOf(msg)(ex => io => this(ex)(io).or(Left(Pair(io.fst(), new Error(msg)))))}
+  or(p) {return  parserOf(this.expect + " or " + p.expect)//using alternative <|>
     (ex => io => {
-      const r = o(ex)(io)
+      const r = this(ex)(io)
       if (isRight(r)) return r;//break `or` parameter expansion
-      return r.or(p(ex)(io)).or(Left(Pair(io.fst(), new Expect(o.or(p).expect))))
-    })
-  const xfname = f => {//aux
-    const ff = f.name || f.toString()
-    return ff.length < 15 ? ff : ff.substr(0, 12) + "..."
+      return r.or(p(ex)(io)).or(Left(Pair(io.fst(), new Expect(this.or(p).expect))))
+    })}
+  as(f) {
+    const xfname = f => {//aux
+      const ff = f.name || f.toString()
+      return ff.length < 15 ? ff : ff.substr(0, 12) + "..."
+    }
+    return  parserOf
+      ("(" + this.expect + ")->as(" + xfname(f) + ")")
+      (ex => io => Pair(io.fst(), []).mbind(this(ex)).map(map(f)).map(map(x => io.snd().append(x))))
   }
-  o.as = f => parserOf
-    ("(" + o.expect + ")->as(" + xfname(f) + ")")
-    (ex => io => Pair(io.fst(), []).mbind(o(ex)).map(map(f)).map(map(x => io.snd().append(x))))
-  o.join = p => parserOf
-    (typeof p === "undefined" ? "(" + o.expect + ")->join()" : "(" + o.expect + ")->join(\"" + p + "\")")
-    (ex => io => typeof p === "undefined" ? o.as(mconcat)(ex)(io) : o.as(o => o.join(p))(ex)(io))
-  o.expect = e
-  return (self => o)(o)
-})
+  join(p) {return  parserOf
+    (typeof p === "undefined" ? "(" + this.expect + ")->join()" : "(" + this.expect + ")->join(\"" + p + "\")")
+    (ex => io => typeof p === "undefined" ? this.as(mconcat)(ex)(io) : this.as(o => this.join(p))(ex)(io))}
+}
+
+
+//recursively extends the parser continuations (.then, .skip, .or, ...)
+// const parserOf = curry((e, o) => {
+//   clog("parserOf",e)
+//   parse(s) {return  o()(Pair(s, []))
+//   post(f) {return parserOf
+//     (o.expect+" verify of "+f)
+//     (ex=>io=>f(o(io)))
+//   o.chk=curry((m,f)=>parserOf(o.expect+" check of "+f)
+//     (ex=>io=>{
+//       const r=o.onFailMsg(m)(io)
+//       if(isLeft(r)||f(fromRight(r).snd())) return r
+//       return Left(Pair(io.fst(),new Error(m)))
+//     }))
+
+//   then(qp) {return  (p => parserOf(o.expect + "\nthen " + p.expect)
+//     (ex => io => io.mbind(o(p)).mbind(p(ex))))(quickParam(qp))
+
+//   skip(p) {return  parserOf(o.expect + "\nskip " + p.expect)
+//     (ex => io => {
+//       const os = io.mbind(o(p))
+//       return os.mbind(p(ex)).map(map(o => snd(fromRight(os))))//.when(os)
+//     })
+  
+//   lookAhead(p) {return  parserOf(o.expect + " when look ahead for " + p.expect)
+//     (ex => io => {
+//       const r=o(ex)(io)
+//       const ps = r.mbind(p())
+//       if (isLeft(ps)) return ps
+//       return r
+//     })
+//   excluding(p) {return  parserOf(o.expect + " excluding " + p.expect)
+//     (ex => io => {
+//       const ps = p(ex)(io)
+//       if (isRight(ps)) return Left(Pair(io.fst(), new Expect(o.excluding(p).expect)))
+//       return o(ex)(io)
+//     })
+//   notFollowedBy(p) {return  parserOf
+//     (o.expect + " not followed by " + p.expect)
+//     (ex => io => {
+//       const os = o(ex)(io)
+//       const ps = os.mbind(p(ex))
+//       return isLeft(ps) ? os : Left(Pair(io.fst(), new Expect(o.notFollowedBy(p).expect)))
+//     })
+//   onFailMsg(msg) {return  parserOf(msg)(ex => io => o(ex)(io).or(Left(Pair(io.fst(), new Error(msg)))))
+//   or(p) {return  parserOf(o.expect + " or " + p.expect)//using alternative <|>
+//     (ex => io => {
+//       const r = o(ex)(io)
+//       if (isRight(r)) return r;//break `or` parameter expansion
+//       return r.or(p(ex)(io)).or(Left(Pair(io.fst(), new Expect(o.or(p).expect))))
+//     })
+//   const xfname = f => {//aux
+//     const ff = f.name || f.toString()
+//     return ff.length < 15 ? ff : ff.substr(0, 12) + "..."
+//   }
+//   as(f) {return  parserOf
+//     ("(" + o.expect + ")->as(" + xfname(f) + ")")
+//     (ex => io => Pair(io.fst(), []).mbind(o(ex)).map(map(f)).map(map(x => io.snd().append(x))))
+//   join(p) {return  parserOf
+//     (typeof p === "undefined" ? "(" + o.expect + ")->join()" : "(" + o.expect + ")->join(\"" + p + "\")")
+//     (ex => io => typeof p === "undefined" ? o.as(mconcat)(ex)(io) : o.as(o => o.join(p))(ex)(io))
+//   o.expect = e
+//   return (self => o)(o)
+// })
 
 // Combinators --------------
 
