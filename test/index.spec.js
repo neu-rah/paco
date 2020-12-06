@@ -44,7 +44,7 @@ const {
 describe("Parser",function() {
   it("parser `none` and utilities",async ()=>{
     assert.deepStrictEqual(none()(Pair("",[])),Right(Pair("",[])),"parser boot, always succeeds, no consume initial parser state")
-    assert.deepStrictEqual(parse(">")(none())(""),Right([]),"`parse` function")
+    assert.deepStrictEqual(parse(">")(none)(""),Right([]),"`parse` function")
     assert.deepStrictEqual(parse(">")(char('x'))("x"),Right(["x"]),"char('x')")
     assert(isLeft(parse(">")(char('x'))("")),"eof fail")
   })
@@ -206,7 +206,7 @@ describe("Metaparsers",function() {
     )
   })
   it("between",async ()=>{
-    const parsing=parse(">")(between(space)(many1(noneOf(" ")))(space).join())
+    const parsing=parse(">")(between(space,space,many1(noneOf(" "))).join())
     assert.deepStrictEqual(
       parsing(" ab.12 "),
       Right(["ab.12"]),"between match"
