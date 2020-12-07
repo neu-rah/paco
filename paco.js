@@ -308,12 +308,18 @@ const optional=p=>new Meta(io=>p(io).or(Right(io))).failMsg("optional "+p.expect
 const choice=ps=>foldl1(a=>b=>a.or(b))(ps)
 
 class Many extends Parser.Link {
+  constructor(o){
+    super(o)
+    this.ex=undefined
+  }
   get expect() {return "many("+this.target.expect+")"}//never fails
   level() {return 2}
-  setEx(ex) {this.ex=ex}
+  setEx(ex) {
+    if(this.ex) throw new Error("wtf!")
+    this.ex=ex}
   _parse(io) {
     if(this.ex) {
-      clog("many, setting exclusions")
+      clog("many, setting exclusion of",this.ex.expect)
       switch(this.ex.constructor.name) {
         case "Excluding": return many(this.target.excluding(this.ex.next))(io)
         case "LookAhead": return many(this.target.lookAhead(this.ex.next))(io)
@@ -463,3 +469,5 @@ exports.Meta=Meta
 // clog(digits.join().excluding(oneOf("89")).parse("123988213"))
 // clog(digits.join().lookAhead(oneOf("89")).parse("1899213"))
 // clog(parse(">")(optional(digits).then(letter).join())("123a"))
+digits.lookAhead(oneOf("89"))
+clog(letter.then(digits.join()).parse("a12"))
