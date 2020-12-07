@@ -3,24 +3,25 @@
 **javascript monadic parser combinators**
 
 ```javascript
-const p=
+const myParser=
   skip(char('#'))
-  .then(many(letter).join(""))
+  .then(many(letter).join())
   .skip(char('-'))
-  .then(digits.join("").as(o=>o*1))
+  .then(digits.join().as(parseInt))
 
-parse(">")(p)("#AN-123")
+parse(">")(myParser)("#AN-123")
 ```
-> _note: `parseInt` could have been used in place of `o=>o*1`_
-
 outputs:
 ```javascript
 TC_Right { value: [ 'AN', 123 ] }
 ```
 
-All parsers can chain up or group to form other parsers.
+All parsers can chain up or group to form other parsers that still can chain up and group.
 
-For now parsers accept a state pair of (input,output) and will return `Either` a pair of input state and an error or a pair of input state and parsed content.
+For now parsers accept a state pair of (input,output) and will return `Either`:  
+
+- on error: a pair of input state and an error  
+- on success: a pair of input state and parsed content.
 
 _*expect changes on this arguments format_
 
@@ -33,12 +34,15 @@ Some parsers are already a composition with metaparsers, that is the case of `di
 #>digits.join().as(parseInt).then(digit).parse("1234")
 TC_Right { value: TC_Pair { a: '', b: [ 123, '4' ] } }
 ```
-
-`.then` and `.skip` inject exclusion parameters on the chain
+`.then` and `.skip` inject exclusion parameters on the chain at construction time
 
 `many` will peeks this parameters and exclude the sequence match
 
-on the example `digits` is a composed parser, using `many`, nonetheless the parameters traversed the `.join` and `.as` modifiers and were excluded from the match loop.
+on the example `digits` is a composed parser, using `many`, nonetheless the parameters traversed the `.join` and `.as` modifiers and were excluded from the `many` match loop.
+
+> `p.exlude(q) || p.lookAhead(q)` is used as `many` pattern in place of `p` when `q` follows `p` and `q` is a character parser
+
+_this parser is inspired but not following "parsec"_
 
 ---
 ## .then | .skip

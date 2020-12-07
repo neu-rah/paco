@@ -13,6 +13,8 @@
 //   parse,res,parserOf
 // }=require("paco");
 
+const fs=require("fs");
+const { isLeft, fromLeft, fromRight } = require("funjs");
 const paco=require("../../paco");
 
 const unescaped=
@@ -22,13 +24,13 @@ const unescaped=
 
 //2. JSON Grammar
 
-const ws = paco.many(paco.oneOf("\u{20}\u{09}\u{0A}\u{0D}"))
-const begin_array     = paco.skip(ws).then(paco.char("\u{5B}")).skip(ws)// [ left square bracket
-const begin_object    = paco.skip(ws).then(paco.char("\u{7B}")).skip(ws)// { left curly bracket
-const end_array       = paco.skip(ws).then(paco.char("\u{5D}")).skip(ws)// ] right square bracket
-const end_object      = paco.skip(ws).then(paco.char("\u{7D}")).skip(ws)// } right curly bracket
-const name_separator  = paco.skip(ws).then(paco.char("\u{3A}")).skip(ws)// : colon
-const value_separator = paco.skip(ws).then(paco.char("\u{2C}")).skip(ws)// , comma
+const ws = paco.many(paco.oneOf("\u{20}\u{09}\u{0A}\u{0D}")).join()
+const begin_array     = ws.then(paco.char("\u{5B}")).then(ws)// [ left square bracket
+const begin_object    = ws.then(paco.char("\u{7B}")).then(ws)// { left curly bracket
+const end_array       = ws.then(paco.char("\u{5D}")).then(ws)// ] right square bracket
+const end_object      = ws.then(paco.char("\u{7D}")).then(ws)// } right curly bracket
+const name_separator  = ws.then(paco.char("\u{3A}")).then(ws)// : colon
+const value_separator = ws.then(paco.char("\u{2C}")).then(ws)// , comma
 
 //7. Strings
 const quotation_mark=paco.char("\u{22}")
@@ -57,21 +59,51 @@ const value
   .or(object())
   .or(array())
   .or(number)
-  .or(string)
+  .or(string).join()
 //5. Arrays
 const member = string.then(name_separator).then(value)
 function array() {
-  return paco.parserOf("Array")
-    (ex=>io=>begin_array.then(paco.optional(paco.sepBy(value,value_separator))).then(end_array)(ex)(io))
+  return new paco.Meta(
+    io=>begin_array
+    .then(
+      paco.optional(
+        value.then(
+          paco.many( value_separator.then(value))
+        )
+      )
+    ).then(end_array)(io)
+  )
 }
 //4. Objects
 function object() {
-  return paco.parserOf("Object")
-    (ex=>io=>begin_object.then(paco.optional(paco.sepBy(member,value_separator.then(member)))).then(end_object)(ex)(io))
+  return new paco.Meta(
+    io=>paco.skip(begin_object)
+    .then(
+      paco.optional(
+        member.then(
+          paco.many( paco.skip(value_separator).then(member) )
+        )
+      )
+    ).skip(end_object)(io))
 }
-paco.parserOf("Object")(object)
 
 //2. Grammar
 const JSON_text = paco.skip(ws).then(value).skip(ws)
 
-console.log(paco.res("")(JSON_text.parse('{"o":[123]}')))
+const json=s=>{
+  const r=paco.res("JSON>")(JSON_text.parse(s))
+  if(isLeft(r)) console.log(fromLeft(r))
+  else return fromRight(r)
+}
+
+const parseFile=fn=>{return json(fs.readFileSync(fn,'utf8'))}
+
+if(process.argv[2]){
+  const start=new Date()
+  console.log(parseFile(process.argv[2]))
+  const end=new Date()
+  console.log((end-start)/1000,"s")
+}
+
+// console.log(JSON_text.parse('[1]'))
+// console.log(paco.res("")(JSON_text.parse('{"o":[123]}')))

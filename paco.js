@@ -90,6 +90,10 @@ class Parser extends Function {
   then(p) {return new Parser.Then(this,p)}
 
   static Skip=class extends Parser.Chain {
+    constructor(o,p) {
+      super(o,p)
+      if(p.level()===0) o.setEx(p)
+    }
     get expect() {return this.target.expect+"\nskip "+this.next.expect}
     _parse(io) {
       const os=io.mbind(this.target)
@@ -99,6 +103,10 @@ class Parser extends Function {
   skip(p) {return new Parser.Skip(this,p)}
 
   static LookAhead=class extends Parser.Chain {
+    constructor(o,p) {
+      super(o,p)
+      if(p.level()===0) o.setEx(p)
+    }
     get expect() {return this.target.expect+" but look ahead for "+this.next.expect}
     _parse(io) {
       const r=this.target(io)
@@ -110,6 +118,10 @@ class Parser extends Function {
   lookAhead(p) {return new Parser.LookAhead(this,p)}
 
   static Excluding=class extends Parser.Chain {
+    constructor(o,p) {
+      super(o,p)
+      if(p.level()===0) o.setEx(p)
+    }
     get expect() {return this.target.expect+" excluding "+this.next.expect}
     _parse(io) {
       const ps=this.next(io)
@@ -442,4 +454,3 @@ exports.Meta=Meta
 // exports.chrono=chrono
 // exports.time=time
 
-// parse(">")(optional(digits).then(letter).join())("123a")
