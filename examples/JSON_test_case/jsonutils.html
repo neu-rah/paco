@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>JSONUtils</title>
+	</head>
+	<body>
+		<h2>JSON String</h2>
+		<p id="jsonString">{"test1":"testValue1", "test2":"testValue2", "test3":"testValue3", "test4":"testValue4", "test5":"testValue5", "test5":"testValue5", "subObj":{"subtest1":"subtestValue1", "subtest2":"subtestValue2", "subtest3":"subtestValue3", "subtest4":"subtestValue4", "subtest5":"subtestValue5", "subtest5":"subtestValue5"}}</p>
+		
+		<h2>Parsing: Time elapsed</h2>
+		<p id="parseDeltaTimer"></p>
+		
+		<h2>Stringifying: Time elapsed</h2>
+		<p id="stringifyDeltaTimer"></p>
+		
+		<script src="JSONUtils.js"></script>
+		<script>
+			var obj = {
+				"test1":"testValue1", 
+				"test2":"testValue2", 
+				"test3":"testValue3", 
+				"test4":"testValue4", 
+				"test5":"testValue5", 
+				"test5":"testValue5",
+				subObj: {
+					"subtest1":"subtestValue1", 
+					"subtest2":"subtestValue2", 
+					"subtest3":"subtestValue3", 
+					"subtest4":"subtestValue4", 
+					"subtest5":"subtestValue5", 
+					"subtest5":"subtestValue5"
+				}
+			},			
+			str = document.getElementById('jsonString').innerHTML,
+			startTime = new Date(),
+			parseDeltaTime,
+			stringifyDeltaTime;
+			
+			for (var i=0; i <= 20000; i++) {
+				JSONUTIL.parse(str);
+			}
+			
+			parseDeltaTime = new Date() - startTime;
+			
+			startTime = new Date();
+			
+			for (var i=0; i <= 20000; i++) {
+				JSONUTIL.stringify(obj);
+			}
+			
+			stringifyDeltaTime = new Date() - startTime;
+			
+			document.getElementById('parseDeltaTimer').innerHTML = parseDeltaTime.toString() + ' ms';
+			document.getElementById('stringifyDeltaTimer').innerHTML = stringifyDeltaTime.toString() + ' ms';
+		</script>
+	</body>
+</html>

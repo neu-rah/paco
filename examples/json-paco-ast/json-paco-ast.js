@@ -16,13 +16,14 @@ const { userInfo } = require("os");
 
 //2. JSON Grammar
 
-const ws = paco.skip(paco.many(paco.oneOf("\u{20}\u{09}\u{0A}\u{0D}")))
-const begin_array     = ws.then(paco.char("\u{5B}")).then(ws)// [ left square bracket
-const begin_object    = ws.then(paco.char("\u{7B}")).then(ws)// { left curly bracket
-const end_array       = ws.then(paco.char("\u{5D}")).then(ws)// ] right square bracket
-const end_object      = ws.then(paco.char("\u{7D}")).then(ws)// } right curly bracket
-const name_separator  = ws.then(paco.char("\u{3A}")).then(ws)// : colon
-const value_separator = ws.then(paco.char("\u{2C}")).then(ws)// , comma
+// const ws = paco.many(paco.skip(paco.oneOf("\u{20}\u{09}\u{0A}\u{0D}")))
+const ws = paco.many(paco.skip(paco.oneOf(" \t\n\r")))
+const begin_array     = ws.then(paco.char("[")).then(ws)// [ left square bracket
+const begin_object    = ws.then(paco.char("{")).then(ws)// { left curly bracket
+const end_array       = ws.then(paco.char("]")).then(ws)// ] right square bracket
+const end_object      = ws.then(paco.char("}")).then(ws)// } right curly bracket
+const name_separator  = ws.then(paco.char(":")).then(ws)// : colon
+const value_separator = ws.then(paco.char(",")).then(ws)// , comma
 
 //7. Strings
 // const quotation_mark=paco.char("\u{22}")
@@ -73,23 +74,25 @@ const value=
 value.expect="value"
 //5. Arrays
 function array() {
-  return paco.parserOf("Array")
-  (ex=>io=>(
+  return new paco.Meta(
+    ex=>io=>
     paco.skip(begin_array)
     .then(paco.optional(paco.sepBy(value,value_separator)))
-    .skip(end_array).as(o=>[o]))(ex)(io))}
+    .skip(end_array).as(o=>[o])(ex)(io)
+  ).failMsg("Array")
+}
 //4. Objects
 const member = string.skip(name_separator).then(value).as(o=>[o])
 function object() {
-  return paco.parserOf("Object")
-    (ex=>io=>
-      paco.skip(begin_object)
-      .then(paco.optional(member.then(paco.many( paco.skip(value_separator).then(member) ))))
-      .skip(end_object).as(o=>{
-        var obj={}
-        o.map(o=>obj[o[0]]=o[1])
-        return obj
-      })(ex)(io))
+  return new paco.Meta(
+    ex=>io=>paco.skip(begin_object)
+    .then(paco.optional(member.then(paco.many( paco.skip(value_separator).then(member) ))))
+    .skip(end_object).as(o=>{
+      var obj={}
+      o.map(o=>obj[o[0]]=o[1])
+      return obj
+    })(ex)(io)
+  ).failMsg("Object")
 }
 
 //2. Grammar
@@ -107,7 +110,10 @@ if(process.argv[2]){
   console.log(parseFile(process.argv[2]))
 }
 
+console.log("#parsers:",paco.maps)
+const start=new Date()
 console.log(parseFile("/home/azevedo/code/nodes/paco/examples/json-paco-ast/ex1.json"))
-// const fc=fs.readFileSync("/home/azevedo/code/nodes/paco/examples/json-paco-ast/ex1.json",'utf8')
+const end=new Date()
+console.log((end-start)/1000,"s")
+console.log("#parsers:",paco.maps)
 
-// console.log(json('{\n"fruit": "Apple","size": "Large","test":"ok"}'))
