@@ -189,17 +189,17 @@ this classes are embedded into the main Parser class as static members
 
 ```text
 Parser
-+-Link (TODO: unless we need other Parser derivates, put this funtionality into Parser)
++-Link parser augmenting (TODO: unless we need other Parser derivates, put this funtionality into Parser)
   |-FailMsg override expect msg, present it as error (no final msg composition)
-  |-As
-  +-Chain
-    |-Or
-    |-NotFollowedBy
-    +-Exclusive
-      |-Then
-      |-Skip
-      |-LookAhead
-      \-Excluding
+  |-As use a function to process a parsing result
+  +-Chain parser chaining, sort of pure virtual, we make no direct instances of this
+    |-Or a chain of alternative parsers
+    |-NotFollowedBy .notFolloed parser extension
+    +-Exclusive for objects that can inject exclusion and re-write the rules
+      |-Then parser sequence
+      |-Skip parse sequence with later content drop
+      |-LookAhead next parser should be valid althou not "parsed" (consumed) yet
+      \-Excluding excludes some cases from the previous parser
 ```
 
 ## Parsers

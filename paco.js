@@ -318,7 +318,7 @@ class Many extends Parser.Link {
   get expect() {return "many("+this.target.expect+")"}//never fails
   level() {return 2}
   setEx(ex) {
-    if(ex.level()!==0) throw new Error("expecting character level parser here")
+    if(ex.next.level()!==0) throw new Error("expecting character level parser here")
     switch(ex.constructor.name) {
       case "Excluding": return many(this.target.excluding(ex.next))
       case "LookAhead": return many(this.target.lookAhead(ex.next))
