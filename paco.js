@@ -44,15 +44,11 @@ const quickParam=p=>typeof p === "string" ? (p.length === 1 ? char(p) : string(p
 //   return f
 // }
 
-let maps=0
-
 class Parser extends Function {
   constructor() {
     super('...args', 'return this.__self__._run(...args)')
     var self=this.bind(this)
     this.__self__=self
-    // maps.push(self)
-    maps++
     return self
   }
   _run(...args){
@@ -62,6 +58,7 @@ class Parser extends Function {
   }
   level() {return 0}
   parse(s,ex) {return this(ex)(Pair(s, []))}
+  // parse(s,ex) {return this(ex)(Pair(SStr(s), []))}
   // post(f) {return parserOf
   //   (this.expect+" verify of "+f)
   //   (ex=>io=>f(this(io)))}
@@ -259,7 +256,9 @@ class Str extends Parser {
   }
   get expect() {return "string `"+this.str+"`"}
   _parse(ex) {
-    return (foldr1(a=>b=>b.then(a))(this.str.split("").map(o=>char(o))).join())(ex)
+    return io=>io.fst().startsWith(this.std)?Right(io.fst().substr(this.str.length),io.snd().append(this.str)):Left(this.expect)
+    //above provided method is fater as expected... however error report is not at character level
+    // return (foldr1(a=>b=>b.then(a))(this.str.split("").map(o=>char(o))).join())(ex)
   }
 }
 // //match a string
@@ -444,18 +443,19 @@ exports.Pair=Pair
 exports.SStr=SStr
 exports.Meta=Meta
 
-exports.maps=maps
+// exports.maps=maps
 
-const chrono=p=>{
+const chrono=(p,cnt)=>{
   const start=new Date()
-  for(var n=1000;n;n--) p()
+  for(var n=cnt;n;n--) p()
   const end=new Date()
   const elapsed=end-start
-  console.log((elapsed)/1000,"s")
-  return elapsed
+  const avg=elapsed/cnt
+  console.log(avg/1000,"s")
+  return avg
 }
 
-const time=p=>io=>chrono(()=>p.parse(io))
+const time=p=>io=>chrono(()=>p.parse(io),100)
 
 exports.chrono=chrono
 exports.time=time

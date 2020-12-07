@@ -33,7 +33,7 @@ const value_separator = ws.then(paco.char(",")).then(ws)// , comma
 // const string=paco.skip(quotation_mark).then(paco.many(char)).skip(quotation_mark).join().as(o=>o[0])
 const string
   =paco.skip(paco.char('"'))
-  .then( paco.many(paco.char('\\')
+  .then(paco.many(paco.char('\\')
   .then(paco.anyChar).or(paco.noneOf('"'))) )
   .skip(paco.char('"')).join("")
 string.expect="quoted string"
@@ -110,10 +110,10 @@ if(process.argv[2]){
   console.log(parseFile(process.argv[2]))
 }
 
-console.log("#parsers:",paco.maps)
-const start=new Date()
-console.log(parseFile("/home/azevedo/code/nodes/paco/examples/json-paco-ast/ex3.json"))
-const end=new Date()
-console.log((end-start)/1000,"s")
-console.log("#parsers:",paco.maps)
+// const start=new Date()
+// console.log(parseFile("/home/azevedo/code/nodes/paco/examples/json-paco-ast/ex6.json"))
+// const end=new Date()
+// console.log((end-start)/1000,"s")
 
+paco.time(JSON_text)('{"test1":"testValue1", "test2":"testValue2", "test3":"testValue3", "test4":"testValue4", "test5":"testValue5", "test6":"testValue6", "subObj":{"subtest1":"subtestValue1", "subtest2":"subtestValue2", "subtest3":"subtestValue3", "subtest4":"subtestValue4", "subtest5":"subtestValue5", "subtest6":"subtestValue6"}}')
+console.log("end.")
