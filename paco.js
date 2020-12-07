@@ -57,6 +57,7 @@ class Parser extends Function {
     return this._parse(...args)
   }
   level() {return 0}
+  setEx(ex) {}
   parse(s,ex) {return this(ex)(Pair(s, []))}
   // parse(s,ex) {return this(ex)(Pair(SStr(s), []))}
   // post(f) {return parserOf
@@ -75,6 +76,7 @@ class Parser extends Function {
       super()
       this.target=o
     }
+    setEx(ex) {this.target.setEx(ex)}
     level() {return this.target.level()+1}
   }
   //chain this parser to another
@@ -86,6 +88,13 @@ class Parser extends Function {
     level() {return this.target.level()+1}
   }
   static Then=class extends Parser.Chain {
+    constructor(o,p) {
+      super(o,p)
+      if(p.level()===0) {
+        clog("Then: setting",o.expect,"to exclude:",p.expect)
+        o.setEx(p)
+      }
+    }
     get expect() {return this.target.expect+"\nthen "+this.next.expect}
     _parse(ex) {
       // if(this.next.level()==0) clog("excluding",this.next.expect)
@@ -216,13 +225,12 @@ class None extends Parser {
 // also an "id" combinator to apply continuations on root elements
 const none=new None()
 
-class Skip extends Parser {
+class Skip extends Parser.Link {
   constructor(p) {
-    super()
-    this.next=p
+    super(p)
   }
-  get expect() {return "skip "+this.next.expect}
-  _parse(ex) {return none.skip(this.next)(ex)}
+  get expect() {return "skip "+this.target.expect}
+  _parse(ex) {return none.skip(this.target)(ex)}
 }
 //apply skip (continuation) to the root element, using `none` combinator
 const skip=o=>new Skip(o)
@@ -316,16 +324,34 @@ const optional=p=>new Meta(ex=>io=>p(ex)(io).or(Right(io))).failMsg("optional "+
 
 const choice=ps=>foldl1(a=>b=>a.or(b))(ps)
 
-const many=p=>new Meta(
-  ex=>io=>{
-    if(ex) {
-      return many(new Meta(
-        (_=>i=>p.excluding(ex)()(i).or(p.lookAhead(ex)()(i)))
-      ).failMsg(p.expect+" but "+ex.expect))()(io)
+class Many extends Parser.Link {
+  get expect() {return "many("+this.target.expect+")"}//never fails
+  level() {return 2}
+  setEx(ex) {
+    clog("Meta::setEx",ex.expect,"on",this.expect)
+    this.ex=ex}
+  _parse(ex) {
+    return io=>{
+      clog("many target:",this.ex)
+      if(this.ex) {
+        clog("many",this.target.expect,"exluding",this.ex)
+        return many(this.target.excluding(this.ex).or(this.target.lookAhead(this.ex)))()(io)
+      }
+      return this.target.then(many(this.target))(this.ex)(io).or(Right(io))
     }
-    return p.then(many(p))(ex)(io).or(Right(io))
   }
-).failMsg("many("+p.expect+")")//never fails
+}
+const many=p=>new Many(p)
+// const many=p=>new Meta(
+//   ex=>io=>{
+//     if(ex) {
+//       return many(new Meta(
+//         (_=>i=>p.excluding(ex)()(i).or(p.lookAhead(ex)()(i)))
+//       ).failMsg(p.expect+" but "+ex.expect))()(io)
+//     }
+//     return p.then(many(p))(ex)(io).or(Right(io))
+//   }
+// ).failMsg("many("+p.expect+")")//never fails
 
 const many1=p=>(p.then(many(p))).failMsg("at least one "+p.expect)
 
@@ -459,3 +485,5 @@ const time=p=>io=>chrono(()=>p.parse(io),100)
 
 exports.chrono=chrono
 exports.time=time
+
+clog(digits.join().then(digit).parse("121"))
