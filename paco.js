@@ -67,7 +67,6 @@ class Parser extends Function {
       this.target=o
     }
     setEx(ex) {
-      if(!this.target.setEx) throw new Error("etf!")
       this.target.setEx(ex)}
     level() {return this.target.level()+1}
   }
@@ -82,7 +81,7 @@ class Parser extends Function {
   static Then=class extends Parser.Chain {
     constructor(o,p) {
       super(o,p)
-      if(p.level()===0) o.setEx(p)
+      if(p.level()===0) o.setEx(this)
     }
     get expect() {return this.target.expect+"\nthen "+this.next.expect}
     _parse(io) {return io.mbind(this.target).mbind(this.next)}
@@ -92,7 +91,7 @@ class Parser extends Function {
   static Skip=class extends Parser.Chain {
     constructor(o,p) {
       super(o,p)
-      if(p.level()===0) o.setEx(p)
+      if(p.level()===0) o.setEx(this)
     }
     get expect() {return this.target.expect+"\nskip "+this.next.expect}
     _parse(io) {
@@ -105,7 +104,7 @@ class Parser extends Function {
   static LookAhead=class extends Parser.Chain {
     constructor(o,p) {
       super(o,p)
-      if(p.level()===0) o.setEx(p)
+      if(p.level()===0) o.setEx(this)
     }
     get expect() {return this.target.expect+" but look ahead for "+this.next.expect}
     _parse(io) {
@@ -120,7 +119,7 @@ class Parser extends Function {
   static Excluding=class extends Parser.Chain {
     constructor(o,p) {
       super(o,p)
-      if(p.level()===0) o.setEx(p)
+      if(p.level()===0) o.setEx(this)
     }
     get expect() {return this.target.expect+" excluding "+this.next.expect}
     _parse(io) {
@@ -313,9 +312,16 @@ class Many extends Parser.Link {
   level() {return 2}
   setEx(ex) {this.ex=ex}
   _parse(io) {
-    if(this.ex)
-      return many(this.target.excluding(this.ex)
-        .or(this.target.lookAhead(this.ex)))(io)
+    if(this.ex) {
+      clog("many, setting exclusions")
+      switch(this.ex.constructor.name) {
+        case "Excluding": return many(this.target.excluding(this.ex.next))(io)
+        case "LookAhead": return many(this.target.lookAhead(this.ex.next))(io)
+        default:
+          return many(this.target.excluding(this.ex.next)
+            .or(this.target.lookAhead(this.ex.next)))(io)
+      }
+    }
     return this.target.then(many(this.target))(io).or(Right(io))
   }
 }
@@ -454,3 +460,6 @@ exports.Meta=Meta
 // exports.chrono=chrono
 // exports.time=time
 
+// clog(digits.join().excluding(oneOf("89")).parse("123988213"))
+// clog(digits.join().lookAhead(oneOf("89")).parse("1899213"))
+// clog(parse(">")(optional(digits).then(letter).join())("123a"))
