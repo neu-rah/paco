@@ -38,12 +38,6 @@ const prim=require("./src/primitives")
 
 const quickParam=p=>typeof p === "string" ? (p.length === 1 ? char(p) : string(p)) : p
 
-// const parserOf=e=>f=>{
-//   clog("parserOf:",e)
-//   Object.setPrototypeOf(f,new Parser(e,f))
-//   return f
-// }
-
 class Parser extends Function {
   constructor() {
     super('...args', 'return this.__self__._run(...args)')
@@ -51,20 +45,16 @@ class Parser extends Function {
     this.__self__=self
     return self
   }
-  _run(...args){
-    // clog("parse:",args)
-    // if(args[0]) clog(this.expect,"except",args.map(o=>o.expect))
-    return this._parse(...args)
-  }
+  _run(...args){return this._parse(...args)}
   level() {return 0}
   setEx(ex) {}
-  parse(s,ex) {return this(ex)(Pair(s, []))}
+  parse(s) {return this(Pair(s, []))}
   // parse(s,ex) {return this(ex)(Pair(SStr(s), []))}
   // post(f) {return parserOf
   //   (this.expect+" verify of "+f)
-  //   (ex=>io=>f(this(io)))}
+  //   (io=>f(this(io)))}
   // chk(m,f) {return parserOf(this.expect+" check of "+f)
-  //   (ex=>io=>{
+  //   (io=>{
   //     const r=this.failMsg(m)(io)
   //     if(isLeft(r)||f(fromRight(r).snd())) return r
   //     return Left(Pair(io.fst(),new Error(m)))
@@ -76,7 +66,9 @@ class Parser extends Function {
       super()
       this.target=o
     }
-    setEx(ex) {this.target.setEx(ex)}
+    setEx(ex) {
+      if(!this.target.setEx) throw new Error("etf!")
+      this.target.setEx(ex)}
     level() {return this.target.level()+1}
   }
   //chain this parser to another
@@ -90,76 +82,59 @@ class Parser extends Function {
   static Then=class extends Parser.Chain {
     constructor(o,p) {
       super(o,p)
-      if(p.level()===0) {
-        clog("Then: setting",o.expect,"to exclude:",p.expect)
-        o.setEx(p)
-      }
+      if(p.level()===0) o.setEx(p)
     }
     get expect() {return this.target.expect+"\nthen "+this.next.expect}
-    _parse(ex) {
-      // if(this.next.level()==0) clog("excluding",this.next.expect)
-      const nex=this.next.level()==0?this.next:undefined
-      return io=>io.mbind(this.target(nex)).mbind(this.next(ex))
-    }
+    _parse(io) {return io.mbind(this.target).mbind(this.next)}
   }
   then(p) {return new Parser.Then(this,p)}
 
   static Skip=class extends Parser.Chain {
     get expect() {return this.target.expect+"\nskip "+this.next.expect}
-    _parse(ex) {
-      return io=>{
-        const os=io.mbind(this.target(this.next))
-        return os.mbind(this.next(ex)).map(map(o=>snd(fromRight(os))))
-      }
+    _parse(io) {
+      const os=io.mbind(this.target)
+      return os.mbind(this.next).map(map(o=>snd(fromRight(os))))
     }
   }
   skip(p) {return new Parser.Skip(this,p)}
 
   static LookAhead=class extends Parser.Chain {
     get expect() {return this.target.expect+" but look ahead for "+this.next.expect}
-    _parse(ex) {
-      return io=>{
-        const r=this.target(ex)(io)
-        const ps=r.mbind(this.next())
-        if (isLeft(ps)) return ps
-        return r
-      }
+    _parse(io) {
+      const r=this.target(io)
+      const ps=r.mbind(this.next)
+      if (isLeft(ps)) return ps
+      return r
     }
   }
   lookAhead(p) {return new Parser.LookAhead(this,p)}
 
   static Excluding=class extends Parser.Chain {
     get expect() {return this.target.expect+" excluding "+this.next.expect}
-    _parse(ex) {
-      return io=>{
-        const ps=this.next(ex)(io)
-        if (isRight(ps)) return Left(Pair(io.fst(), new Expect(this.expect)))
-        return this.target(ex)(io)
-      }
+    _parse(io) {
+      const ps=this.next(io)
+      if (isRight(ps)) return Left(Pair(io.fst(), new Expect(this.expect)))
+      return this.target(io)
     }
   }
   excluding(p) {return new Parser.Excluding(this,p)}
 
   static NotFollowedBy=class extends Parser.Chain {
     get expect() {return this.target.expect+" excluding "+this.next.expect}
-    _parse(ex) {
-      return io=>{
-        const os=this.target(ex)(io)
-        const ps=os.mbind(this.next(ex))
-        return isLeft(ps) ? os : Left(Pair(io.fst(), new Expect(this.expect)))
-      }
+    _parse(io) {
+      const os=this.target(io)
+      const ps=os.mbind(this.next)
+      return isLeft(ps) ? os : Left(Pair(io.fst(), new Expect(this.expect)))
     }
   }
   notFollowedBy(p) {return new Parser.NotFollowedBy(this,p)}
 
   static Or=class extends Parser.Chain {
     get expect() {return this.target.expect+" or "+this.next.expect}
-    _parse(ex) {
-      return io=>{
-        const r=this.target(ex)(io)
-        if (isRight(r)) return r;//break `or` parameter expansion
-        return r.or(this.next(ex)(io)).or(Left(Pair(io.fst(), new Expect(this.expect))))
-      }
+    _parse(io) {
+      const r=this.target(io)
+      if (isRight(r)) return r;//break `or` parameter expansion
+      return r.or(this.next(io)).or(Left(Pair(io.fst(), new Expect(this.expect))))
     }
   }
   or(p) {return new Parser.Or(this,p)}
@@ -170,8 +145,8 @@ class Parser extends Function {
       this.msg=msg
     }
     get expect() {return this.msg}
-    _parse(ex) {
-      return io=>this.target(ex)(io).or(Left(Pair(io.fst(), new Error(this.msg))))
+    _parse(io) {
+      return this.target(io).or(Left(Pair(io.fst(), new Error(this.msg))))
     }
   }
   failMsg(msg) {return new Parser.FailMsg(this,msg)}
@@ -188,9 +163,9 @@ class Parser extends Function {
       }
       return "("+this.target.expect+")->as("+xfname(this.func)+")"
     }
-    _parse(ex) {
-      return io=>Pair(io.fst(),[])
-        .mbind(this.target(ex))
+    _parse(io) {
+      return Pair(io.fst(),[])
+        .mbind(this.target)
         .map(map(this.func))
         .map(map(x=>io.snd().append(x)))
     }
@@ -203,11 +178,10 @@ class Parser extends Function {
       this.func=p
     }
     get expect() {return typeof p === "undefined" ? "("+this.target.expect+")->join()" : "("+this.target.expect+")->join(\""+this.func+"\")"}
-    _parse(ex) {
-      return io=>
-        typeof p === "undefined" ? 
-        this.target.as(mconcat)(ex)(io) : 
-        this.target.as(o=>o.join(this.func))(ex)(io)   
+    _parse(io) {
+      return typeof p === "undefined" ? 
+        this.target.as(mconcat)(io) : 
+        this.target.as(o=>o.join(this.func))(io)   
     }
   }
   join(p) {return new Parser.Join(this,p)}
@@ -219,7 +193,7 @@ class None extends Parser {
     super()
   }
   get expect() {return "none"}
-  _parse(_) {return o=>Right(o)}
+  _parse(io) {return Right(io)}
 }
 //parser always succeedes without consuming
 // also an "id" combinator to apply continuations on root elements
@@ -230,7 +204,7 @@ class Skip extends Parser.Link {
     super(p)
   }
   get expect() {return "skip "+this.target.expect}
-  _parse(ex) {return none.skip(this.target)(ex)}
+  _parse(io) {return none.skip(this.target)(io)}
 }
 //apply skip (continuation) to the root element, using `none` combinator
 const skip=o=>new Skip(o)
@@ -241,16 +215,13 @@ class Satisfy extends Parser {
     this.ch=chk
   }
   get expect() {return this.ch.expect || "to satisfy condition"}
-  _parse(ex) {
-    return io=>{
-      // clog("satisfy:",head(io.fst()))
-      return this.ch(head(io.fst())) ?
+  _parse(io) {
+    return this.ch(head(io.fst())) ?
       Right(//success...
         Pair(//build a pair of remaining input and composed output
           tail(io.fst()),//consume input
           io.snd().append([head(io.fst())])))//compose the outputs
       : Left(Pair(io.fst(), new Expect(this.expect)))//or report error
-    }
   }
 }
 //check a character with a boolean function
@@ -263,8 +234,10 @@ class Str extends Parser {
     this.str=str
   }
   get expect() {return "string `"+this.str+"`"}
-  _parse(ex) {
-    return io=>io.fst().startsWith(this.std)?Right(io.fst().substr(this.str.length),io.snd().append(this.str)):Left(this.expect)
+  _parse(io) {
+    return io.fst().startsWith(this.str)?
+      Right(Pair(io.fst().substr(this.str.length),io.snd().append(this.str))):
+      Left(Pair(io.fst(),new Expect(this.expect)))
     //above provided method is fater as expected... however error report is not at character level
     // return (foldr1(a=>b=>b.then(a))(this.str.split("").map(o=>char(o))).join())(ex)
   }
@@ -278,18 +251,16 @@ class Regex extends Parser {
     this.expr=e
   }
   get expect() {return "regex /"+this.expr+"/"}
-  _parse(ex) {
-    return io=>{
-      const r=io.fst().match(this.expr)
-      return r === null ?
-        Left(Pair(io.fst(), new Expect(this.expect))) :
-        Right(
-          Pair(
-            r.input.substr(r[0].length),
-            r.length === 1 ? [r[0]] : r.slice(1, r.length)
-          )
+  _parse(io) {
+    const r=io.fst().match(this.expr)
+    return r === null ?
+      Left(Pair(io.fst(), new Expect(this.expect))) :
+      Right(
+        Pair(
+          r.input.substr(r[0].length),
+          r.length === 1 ? [r[0]] : r.slice(1, r.length)
         )
-    }
+      )
   }
 }
 //regex match
@@ -318,69 +289,54 @@ const eof=satisfy(isEof)
 //meta-parsers ans parser compositions/alias
 class Meta extends Parser.Link {
   level() {return 2}
-  _parse(ex){return this.target(ex)}
+  _parse(io){return this.target(io)}
+  setEx(ex) {}
 }
-const optional=p=>new Meta(ex=>io=>p(ex)(io).or(Right(io))).failMsg("optional "+p.expect)//never fails
+const optional=p=>new Meta(io=>p(io).or(Right(io))).failMsg("optional "+p.expect)//never fails
 
 const choice=ps=>foldl1(a=>b=>a.or(b))(ps)
 
 class Many extends Parser.Link {
   get expect() {return "many("+this.target.expect+")"}//never fails
   level() {return 2}
-  setEx(ex) {
-    clog("Meta::setEx",ex.expect,"on",this.expect)
-    this.ex=ex}
-  _parse(ex) {
-    return io=>{
-      clog("many target:",this.ex)
-      if(this.ex) {
-        clog("many",this.target.expect,"exluding",this.ex)
-        return many(this.target.excluding(this.ex).or(this.target.lookAhead(this.ex)))()(io)
-      }
-      return this.target.then(many(this.target))(this.ex)(io).or(Right(io))
-    }
+  setEx(ex) {this.ex=ex}
+  _parse(io) {
+    if(this.ex)
+      return many(this.target.excluding(this.ex)
+        .or(this.target.lookAhead(this.ex)))(io)
+    return this.target.then(many(this.target))(io).or(Right(io))
   }
 }
 const many=p=>new Many(p)
-// const many=p=>new Meta(
-//   ex=>io=>{
-//     if(ex) {
-//       return many(new Meta(
-//         (_=>i=>p.excluding(ex)()(i).or(p.lookAhead(ex)()(i)))
-//       ).failMsg(p.expect+" but "+ex.expect))()(io)
-//     }
-//     return p.then(many(p))(ex)(io).or(Right(io))
-//   }
-// ).failMsg("many("+p.expect+")")//never fails
 
 const many1=p=>(p.then(many(p))).failMsg("at least one "+p.expect)
 
 const manyTill=curry((p,e)=>new Meta(
-  ex=>io=>p.excluding(e).then(manyTill(p,e))()(io).or(Right(io))
+  io=>p.excluding(e).then(manyTill(p,e))(io).or(Right(io))
 ).failMsg("many "+p.expect+" until "+e.expect))//never fails
 
 const count=curry((n,p)=>new Meta(
-  ex=>io=>n ? p.then(count(n-1,p))(ex)(io) : Right(io)
+  io=>n ? p.then(count(n-1,p))(io) : Right(io)
 ).failMsg(n+" of "+p.expect))
 
 const between=curry((open,close,p)=>skip(open).then(p).skip(close))
 
 const option=curry((x, p)=>new Meta(
-  ex=>io=>p(ex)(io).or(Right(Pair(io.fst(), x)))
+  io=>p(io).or(Right(Pair(io.fst(), x)))
 ).failMsg("option "+p.expect+" else "+x))
 
 const optionMaybe=p=>new Meta(
-  ex=>io=>p.as(Just)(ex)(io).or(Right(Pair(io.fst(), Nothing())))
+  io=>p.as(Just)(io).or(Right(Pair(io.fst(), Nothing())))
 ).failMsg("maybe "+p.expect)
 
 const sepBy=curry((p, sep)=> new Meta(
-  ex=>io=>p.then(many(skip(sep).then(p)))(ex)(io).or(Right(io))
+  io=>p.then(many(skip(sep).then(p)))(io).or(Right(io))
 ).failMsg(p.expect+" separated by "+sep.expect))//never fails
 
 const sepBy1=curry((p,sep)=>p.then(many(skip(sep).then(p))).failMsg(p.expect+" separated by "+sep.expect))
 
 const endBy=curry((p,sep)=>new Meta(
-  ex=>io=>sepBy(p)(sep).then(skip(sep))(ex)(io).or(Right(io))
+  io=>sepBy(p)(sep).then(skip(sep))(io).or(Right(io))
 ).failMsg(p.expect+" separated and ending with "+sep.expect))
 
 const endBy1=curry((p,sep)=>sepBy1(p)(sep).then(skip(sep)).failMsg("at least one of "+p.expect+" separated and ending with "+sep.expect))
@@ -417,7 +373,7 @@ const res=curry((fn, r)=>{
   }
 })
 
-const parse=curry((fn, p, str)=>res(fn)(p()(Pair(str, []))))
+const parse=curry((fn, p, str)=>res(fn)(p(Pair(str, []))))
 
 if (!exports) var exports={}
 
@@ -471,19 +427,19 @@ exports.Meta=Meta
 
 // exports.maps=maps
 
-const chrono=(p,cnt)=>{
-  const start=new Date()
-  for(var n=cnt;n;n--) p()
-  const end=new Date()
-  const elapsed=end-start
-  const avg=elapsed/cnt
-  console.log(avg/1000,"s")
-  return avg
-}
+// const chrono=(p,cnt)=>{
+//   const start=new Date()
+//   for(var n=cnt;n;n--) p()
+//   const end=new Date()
+//   const elapsed=end-start
+//   const avg=elapsed/cnt
+//   console.log(avg/1000,"s")
+//   return avg
+// }
 
-const time=p=>io=>chrono(()=>p.parse(io),100)
+// const time=p=>io=>chrono(()=>p.parse(io),100)
 
-exports.chrono=chrono
-exports.time=time
+// exports.chrono=chrono
+// exports.time=time
 
-clog(digits.join().then(digit).parse("121"))
+// parse(">")(optional(digits).then(letter).join())("123a")
