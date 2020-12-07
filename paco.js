@@ -56,10 +56,11 @@ class Parser extends Function {
     return self
   }
   _run(...args){
-    clog("parse:",args)
-    if(typeof args[0]==="undefined") throw new Error("runing parser with undefined args")
+    // clog("parse:",args)
+    // if(args[0]) clog(this.expect,"except",args.map(o=>o.expect))
     return this._parse(...args)
   }
+  level() {return 0}
   parse(s,ex) {return this(ex)(Pair(s, []))}
   // post(f) {return parserOf
   //   (this.expect+" verify of "+f)
@@ -77,6 +78,7 @@ class Parser extends Function {
       super()
       this.target=o
     }
+    level() {return this.target.level()+1}
   }
   //chain this parser to another
   static Chain=class extends Parser.Link {
@@ -84,10 +86,15 @@ class Parser extends Function {
       super(o)
       this.next=p
     }
+    level() {return this.target.level()+1}
   }
   static Then=class extends Parser.Chain {
     get expect() {return this.target.expect+"\nthen "+this.next.expect}
-    _parse(ex) {return io=>io.mbind(this.target(this.next)).mbind(this.next(ex))}
+    _parse(ex) {
+      // if(this.next.level()==0) clog("excluding",this.next.expect)
+      const nex=this.next.level()==0?this.next:undefined
+      return io=>io.mbind(this.target(nex)).mbind(this.next(ex))
+    }
   }
   then(p) {return new Parser.Then(this,p)}
 
@@ -230,7 +237,9 @@ class Satisfy extends Parser {
   }
   get expect() {return this.ch.expect || "to satisfy condition"}
   _parse(ex) {
-    return io=>{return this.ch(head(io.fst())) ?
+    return io=>{
+      // clog("satisfy:",head(io.fst()))
+      return this.ch(head(io.fst())) ?
       Right(//success...
         Pair(//build a pair of remaining input and composed output
           tail(io.fst()),//consume input
@@ -300,7 +309,10 @@ const blank=satisfy(isBlank)
 const eof=satisfy(isEof)
 
 //meta-parsers ans parser compositions/alias
-class Meta extends Parser.Link {_parse(ex){return this.target(ex)}}
+class Meta extends Parser.Link {
+  level() {return 2}
+  _parse(ex){return this.target(ex)}
+}
 const optional=p=>new Meta(ex=>io=>p(ex)(io).or(Right(io))).failMsg("optional "+p.expect)//never fails
 
 const choice=ps=>foldl1(a=>b=>a.or(b))(ps)

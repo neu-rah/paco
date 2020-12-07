@@ -112,7 +112,7 @@ if(process.argv[2]){
 
 console.log("#parsers:",paco.maps)
 const start=new Date()
-console.log(parseFile("/home/azevedo/code/nodes/paco/examples/json-paco-ast/ex1.json"))
+console.log(parseFile("/home/azevedo/code/nodes/paco/examples/json-paco-ast/ex3.json"))
 const end=new Date()
 console.log((end-start)/1000,"s")
 console.log("#parsers:",paco.maps)
