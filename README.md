@@ -20,8 +20,8 @@ All parsers can chain up or group to form other parsers that still can chain up 
 
 For now parsers accept a state pair of (input,output) and will return `Either`:  
 
-- on error: a pair of input state and an error  
-- on success: a pair of input state and parsed content.
+- on error: a pair of input state and the error  
+- on success: a pair of input state and the parsed content.
 
 _*expect changes on this arguments format_
 
@@ -34,9 +34,14 @@ Some parsers are already a composition with metaparsers, that is the case of `di
 #>digits.join().as(parseInt).then(digit).parse("1234")
 TC_Right { value: TC_Pair { a: '', b: [ 123, '4' ] } }
 ```
-`.then` and `.skip` inject exclusion parameters on the chain at construction time
+`.then`, `.skip` and others inject exclusion check on the chain at construction time.
+We allow the parser base to be re-writen at construction time, keeping away all checking at parse time.
 
 `many` will peeks this parameters and exclude the sequence match
+
+this is only done for character level parsers where the selector is used to rewrite the `many` selector in a way that respects the injecting parser. Please note that `string` is a character level parser and it can _play_ with single character parsers.
+
+Using this schema we avoid the need of manally excluding, specially if we are reading a bottom-up grammar.
 
 on the example `digits` is a composed parser, using `many`, nonetheless the parameters traversed the `.join` and `.as` modifiers and were excluded from the `many` match loop.
 
@@ -156,7 +161,7 @@ TC_Left { value: 'error, expecting digit but found `#` here->#123' }
 
 expected result
 ```javascript
-TC_Right { value: [ 'As-armas-e-os-baroes' ] }
++TC_Right { value: [ 'As-armas-e-os-baroes' ] }
 ```
 
 ```javascript
@@ -182,20 +187,20 @@ TC_Right { value: [ 151 ] }
 
 this classes are embedded into the main Parser class as static members
 
+```text
 Parser
-|-Link
-| |-FailMsg
-| \-As
-|
-\-Chain
- |-NotFollowedBy
- |-Or
- \-Exclusive
-   |-Then
-   |-Skip
-   |-LookAhead
-   \-Excluding
-
++-Link (TODO: unless we need other Parser derivates, put this funtionality into Parser)
+  |-FailMsg override expect msg, present it as error (no final msg composition)
+  |-As
+  +-Chain
+    |-Or
+    |-NotFollowedBy
+    +-Exclusive
+      |-Then
+      |-Skip
+      |-LookAhead
+      \-Excluding
+```
 
 ## Parsers
 
