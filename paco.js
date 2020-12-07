@@ -40,14 +40,14 @@ const quickParam=p=>typeof p === "string" ? (p.length === 1 ? char(p) : string(p
 
 class Parser extends Function {
   constructor() {
-    super('...args', 'return this.__self__._run(...args)')
+    super('...args', 'return this.__self__._parse(...args)')
     var self=this.bind(this)
     this.__self__=self
     return self
   }
-  _run(...args){return this._parse(...args)}
+  // _run(...args){return this._parse(...args)}
   level() {return 0}
-  setEx(ex) {}
+  setEx(ex) {return this}
   parse(s) {return this(Pair(s, []))}
   // parse(s,ex) {return this(ex)(Pair(SStr(s), []))}
   // post(f) {return parserOf
@@ -61,38 +61,40 @@ class Parser extends Function {
   //   })}
 
   //link something to this parser
-  static Link=class extends Parser {
+  static Link=class Link extends Parser {
     constructor(o) {
       super()
-      this.target=o
+      this.target=o//.setEx(this)
     }
-    setEx(ex) {
-      this.target.setEx(ex)}
+    // setEx(ex) {return new Parser.Link(this.target.setEx(ex))}
     level() {return this.target.level()+1}
   }
   //chain this parser to another
-  static Chain=class extends Parser.Link {
+  static Chain=class Chain extends Parser.Link {
     constructor(o,p) {
       super(o)
       this.next=p
     }
+    // setEx(ex) {return new Chain(this.target.setEx(ex),this.next)}
     level() {return this.target.level()+1}
   }
-  static Then=class extends Parser.Chain {
+  static Exclusive=class Exclusive extends Parser.Chain {
     constructor(o,p) {
       super(o,p)
-      if(p.level()===0) o.setEx(this)
+      if(p.level()===0) {
+        this.target=o.setEx(this)
+        if(!this.target) throw new Error("should not be undefined")
+      }
     }
+    setEx(ex) {return this}
+  }
+  static Then=class Then extends Parser.Exclusive {
     get expect() {return this.target.expect+"\nthen "+this.next.expect}
     _parse(io) {return io.mbind(this.target).mbind(this.next)}
   }
   then(p) {return new Parser.Then(this,p)}
 
-  static Skip=class extends Parser.Chain {
-    constructor(o,p) {
-      super(o,p)
-      if(p.level()===0) o.setEx(this)
-    }
+  static Skip=class Skip extends Parser.Exclusive {
     get expect() {return this.target.expect+"\nskip "+this.next.expect}
     _parse(io) {
       const os=io.mbind(this.target)
@@ -101,11 +103,7 @@ class Parser extends Function {
   }
   skip(p) {return new Parser.Skip(this,p)}
 
-  static LookAhead=class extends Parser.Chain {
-    constructor(o,p) {
-      super(o,p)
-      if(p.level()===0) o.setEx(this)
-    }
+  static LookAhead=class LookAhead extends Parser.Exclusive {
     get expect() {return this.target.expect+" but look ahead for "+this.next.expect}
     _parse(io) {
       const r=this.target(io)
@@ -116,11 +114,7 @@ class Parser extends Function {
   }
   lookAhead(p) {return new Parser.LookAhead(this,p)}
 
-  static Excluding=class extends Parser.Chain {
-    constructor(o,p) {
-      super(o,p)
-      if(p.level()===0) o.setEx(this)
-    }
+  static Excluding=class Excluding extends Parser.Exclusive {
     get expect() {return this.target.expect+" excluding "+this.next.expect}
     _parse(io) {
       const ps=this.next(io)
@@ -130,8 +124,9 @@ class Parser extends Function {
   }
   excluding(p) {return new Parser.Excluding(this,p)}
 
-  static NotFollowedBy=class extends Parser.Chain {
+  static NotFollowedBy=class NotFollowedBy extends Parser.Chain {
     get expect() {return this.target.expect+" excluding "+this.next.expect}
+    setEx(ex) {return new Parser.NotFollowedBy(this.target.setEx(ex),this.msg)}
     _parse(io) {
       const os=this.target(io)
       const ps=os.mbind(this.next)
@@ -140,8 +135,9 @@ class Parser extends Function {
   }
   notFollowedBy(p) {return new Parser.NotFollowedBy(this,p)}
 
-  static Or=class extends Parser.Chain {
+  static Or=class Or extends Parser.Chain {
     get expect() {return this.target.expect+" or "+this.next.expect}
+    setEx(ex) {return new Parser.Or(this.target.setEx(ex),this.next)}
     _parse(io) {
       const r=this.target(io)
       if (isRight(r)) return r;//break `or` parameter expansion
@@ -150,23 +146,25 @@ class Parser extends Function {
   }
   or(p) {return new Parser.Or(this,p)}
 
-  static  FailMsg=class extends Parser.Link {
+  static  FailMsg=class FailMsg extends Parser.Link {
     constructor(o,msg) {
       super(o)
       this.msg=msg
     }
     get expect() {return this.msg}
+    setEx(ex) {return new Parser.FailMsg(this.target.setEx(ex),this.msg)}
     _parse(io) {
       return this.target(io).or(Left(Pair(io.fst(), new Error(this.msg))))
     }
   }
   failMsg(msg) {return new Parser.FailMsg(this,msg)}
 
-  static As=class extends Parser.Link {
+  static As=class As extends Parser.Link {
     constructor(o,f) {
       super(o)
       this.func=f
     }
+    setEx(ex) {return new Parser.As(this.target.setEx(ex),this.func)}
     get expect() {
       const xfname=f=>{//aux
         const ff=f.name || f.toString()
@@ -183,11 +181,12 @@ class Parser extends Function {
   }
   as(f) {return new Parser.As(this,f)}
   
-  static Join=class extends Parser.Link {
+  static Join=class Join extends Parser.Link {
     constructor(o,p) {
       super(o)
       this.func=p
     }
+    setEx(ex) {return new Parser.Join(this.target.setEx(ex),this.func)}
     get expect() {return typeof p === "undefined" ? "("+this.target.expect+")->join()" : "("+this.target.expect+")->join(\""+this.func+"\")"}
     _parse(io) {
       return typeof p === "undefined" ? 
@@ -198,7 +197,11 @@ class Parser extends Function {
   join(p) {return new Parser.Join(this,p)}
 }
 
-// Combinators --------------
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Combinators -----------------------------------------------------------------------------------//
+//                                                                                                //
+//                                                                                                //
+////////////////////////////////////////////////////////////////////////////////////////////////////
 class None extends Parser {
   constructor() {
     super()
@@ -301,7 +304,7 @@ const eof=satisfy(isEof)
 class Meta extends Parser.Link {
   level() {return 2}
   _parse(io){return this.target(io)}
-  setEx(ex) {}
+  setEx(ex) {return this}
 }
 const optional=p=>new Meta(io=>p(io).or(Right(io))).failMsg("optional "+p.expect)//never fails
 
@@ -310,24 +313,20 @@ const choice=ps=>foldl1(a=>b=>a.or(b))(ps)
 class Many extends Parser.Link {
   constructor(o){
     super(o)
-    this.ex=undefined
+    // this.ex=undefined
   }
   get expect() {return "many("+this.target.expect+")"}//never fails
   level() {return 2}
   setEx(ex) {
-    if(this.ex) throw new Error("wtf!")
-    this.ex=ex}
-  _parse(io) {
-    if(this.ex) {
-      clog("many, setting exclusion of",this.ex.expect)
-      switch(this.ex.constructor.name) {
-        case "Excluding": return many(this.target.excluding(this.ex.next))(io)
-        case "LookAhead": return many(this.target.lookAhead(this.ex.next))(io)
-        default:
-          return many(this.target.excluding(this.ex.next)
-            .or(this.target.lookAhead(this.ex.next)))(io)
-      }
+    if(ex.level()!==0) throw new Error("expecting character level parser here")
+    switch(ex.constructor.name) {
+      case "Excluding": return many(this.target.excluding(ex.next))
+      case "LookAhead": return many(this.target.lookAhead(ex.next))
+      default:
+        return many(this.target.excluding(ex.next).or(this.target.lookAhead(ex.next)))
     }
+  }
+  _parse(io) {
     return this.target.then(many(this.target))(io).or(Right(io))
   }
 }
@@ -466,8 +465,3 @@ exports.Meta=Meta
 // exports.chrono=chrono
 // exports.time=time
 
-// clog(digits.join().excluding(oneOf("89")).parse("123988213"))
-// clog(digits.join().lookAhead(oneOf("89")).parse("1899213"))
-// clog(parse(">")(optional(digits).then(letter).join())("123a"))
-digits.lookAhead(oneOf("89"))
-clog(letter.then(digits.join()).parse("a12"))

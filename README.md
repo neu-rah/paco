@@ -178,6 +178,25 @@ expected result
 TC_Right { value: [ 151 ] }
 ```
 
+## Parsers classes inheritance map
+
+this classes are embedded into the main Parser class as static members
+
+Parser
+|-Link
+| |-FailMsg
+| \-As
+|
+\-Chain
+ |-NotFollowedBy
+ |-Or
+ \-Exclusive
+   |-Then
+   |-Skip
+   |-LookAhead
+   \-Excluding
+
+
 ## Parsers
 
 - **satisfy(f)** uses a function `char->bool` to evaluate a character
