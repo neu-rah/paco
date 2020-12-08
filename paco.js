@@ -269,7 +269,7 @@ class Regex extends Parser {
       Left(Pair(io.fst(), new Expect(this.expect))) :
       Right(
         Pair(
-          r.input.substr(r[0].length),
+          r.input.substr(r.index+r[0].length),
           r.length === 1 ? [r[0]] : r.slice(1, r.length)
         )
       )
