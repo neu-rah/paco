@@ -41,7 +41,7 @@ const tab=chkOf("tab")(is('\t'))
 const nl=chkOf("newline")(is('\n'))
 const cr=chkOf("carriage return")(is('\r'))
 const blank=chkOf("whitespace")(match(space,tab))
-const eof=o=>chkOf("end of file")(typeof o==="undefined")
+const eof=chkOf("end of file")(o=>typeof o==="undefined")
 
 // const m=match(range('a','z'),range('A','Z'),range('0','9'),is('#'),oneOf(".$"),noneOf("abcd"))
 

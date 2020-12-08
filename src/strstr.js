@@ -22,7 +22,7 @@ class Cursor {
     return (this.str.lines[this.line]&&this.str.lines[this.line][this.col])
   }
   tail() {
-    var eol=typeof this.str.lines[this.line][this.col+1]==="undefined"
+    var eol=typeof this.str.lines[this.line]==="undefined" || typeof this.str.lines[this.line][this.col+1]==="undefined"
     return new Cursor(
       this.str,
       this.line+eol?1:0,

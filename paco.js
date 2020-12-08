@@ -49,7 +49,6 @@ class Parser extends Function {
   level() {return 0}
   setEx(ex) {return this}
   parse(s) {return this(Pair(s, []))}
-  // parse(s,ex) {return this(ex)(Pair(SStr(s), []))}
   // post(f) {return parserOf
   //   (this.expect+" verify of "+f)
   //   (io=>f(this(io)))}
@@ -64,9 +63,8 @@ class Parser extends Function {
   static Link=class Link extends Parser {
     constructor(o) {
       super()
-      this.target=o//.setEx(this)
+      this.target=o
     }
-    // setEx(ex) {return new Parser.Link(this.target.setEx(ex))}
     level() {return this.target.level()+1}
   }
   //chain this parser to another
@@ -75,7 +73,6 @@ class Parser extends Function {
       super(o)
       this.next=p
     }
-    // setEx(ex) {return new Chain(this.target.setEx(ex),this.next)}
     level() {return this.target.level()+1}
   }
   static Exclusive=class Exclusive extends Parser.Chain {
@@ -240,6 +237,7 @@ class Satisfy extends Parser {
 }
 //check a character with a boolean function
 const satisfy=chk=>new Satisfy(chk)
+
 const any=satisfy(isAnyChar)
 
 class Str extends Parser {
@@ -249,11 +247,11 @@ class Str extends Parser {
   }
   get expect() {return "string `"+this.str+"`"}
   _parse(io) {
-    return io.fst().startsWith(this.str)?
-      Right(Pair(io.fst().substr(this.str.length),io.snd().append(this.str))):
-      Left(Pair(io.fst(),new Expect(this.expect)))
-    //above provided method is fater as expected... however error report is not at character level
-    // return (foldr1(a=>b=>b.then(a))(this.str.split("").map(o=>char(o))).join())(ex)
+    return io.fst().startsWith?(
+      io.fst().startsWith(this.str)?
+        Right(Pair(io.fst().substr(this.str.length),io.snd().append(this.str))):
+        Left(Pair(io.fst(),new Expect(this.expect)))
+      ):(foldr1(a=>b=>b.then(a))(this.str.split("").map(o=>char(o))).join())(io)
   }
 }
 // //match a string
@@ -311,10 +309,6 @@ const optional=p=>new Meta(io=>p(io).or(Right(io))).failMsg("optional "+p.expect
 const choice=ps=>foldl1(a=>b=>a.or(b))(ps)
 
 class Many extends Parser.Link {
-  constructor(o){
-    super(o)
-    // this.ex=undefined
-  }
   get expect() {return "many("+this.target.expect+")"}//never fails
   level() {return 2}
   setEx(ex) {
@@ -465,3 +459,4 @@ exports.Meta=Meta
 // exports.chrono=chrono
 // exports.time=time
 
+res(">")(digits1.join().then(string("ok")).then(digits.join()).then(eof).parse(SStr("123ok987787")))
