@@ -108,12 +108,14 @@ class Parser extends Function {
     constructor(o,f,m) {
       super(o)
       this.func=f
+      if(m===true) throw new Error("wtf")
       this.msg=m
     }
     get expect() {return "["+this.target.expect+"]->verify!"}
     run(io) {
-      const r=this.target(io)
-      if(isLeft(r)||this.func(fromRight(r).snd())) return r
+      const r=this.target(Pair(io.fst(),[]))
+      if(isLeft(r)) return r
+      if(this.func(fromRight(r).snd())) return r.map(map(x=>io.snd().append(x)))
       return Left(Pair(io.fst(),new Error(this.msg)))
     }
   }
@@ -532,22 +534,3 @@ exports.Meta=Meta
 // exports.chrono=chrono
 // exports.time=time
 
-// res(">")(digits1.join().then(string("ok")).then(digits.join()).then(eof).parse(SStr("123ok987787")))
-
-// const t=
-//   string("temp: ")
-//   .then(
-//     option("",oneOf("-+")).to("sgn")
-//     .then(digits.join().as(parseInt).to("nr"))
-//     .then(char('K').to("unit"))
-//     .verify(o=>o[1].sgn!=="-","negative Kelvin!")
-//   )
-// clog(res(">")(t.parse("temp: +12K")))
-
-// clog(res(">")(letters.join().then(digits.join().to("ok")).parse("as123")))
-// clog(res(">")(letters.join().to("text").then(digits.join().to("nr")).parse("as123")))
-
-// parse(">")(many(digit).join())("")
-
-// optional(none).highOrder()
-clog(digits.join().then(none.notFollowedBy(none)).parse("1232344"))

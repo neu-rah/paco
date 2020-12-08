@@ -29,15 +29,39 @@ Some available metaparsers like `many()`, `many1()`, `skip()` can accept other p
 
 Some parsers are already a composition with metaparsers, that is the case of `digits`, it will perform `many(digit)`.
 
+## Building objects
+
+`.to(tag)` extender will grab the current parsing group result and store it on object key `tag`
+
+if an object does not exist yet it is created, if there is already an object on the results tail it will be used.
+
+```javascript
+const kchk=
+  string("temp: ")
+  .then(
+    option("",oneOf("-+"))
+    .then(digits)
+    .join().as(parseInt).to("temp")
+    .then(char('K').to("unit"))
+    .verify(o=>o[0].temp>=0,"negative Kelvin!")
+  )
+```
+```javascript
+#>res(">")(kchk.parse("temp: +12K"))
+Right { value: [ 'temp: ', { temp: 12, unit: 'K' } ] }
+```
+
+this, along `.verify` and `.as` allow event callbacks and all sort of automation during the parsing, if not then let me know.
+
 **It's now possible to parse this:**
 ```javascript
 #>digits.join().as(parseInt).then(digit).parse("1234")
 Right { value: Pair { a: '', b: [ 123, '4' ] } }
 ```
-`.then`, `.skip` and others inject exclusion check on the chain at construction time.
+`.then`, `.skip` and others can inject exclusion checks on the chain at construction time.
 We allow the parser base to be re-writen at construction time, keeping away all checking at parse time.
 
-`many` will peeks this parameters and exclude the sequence match
+`many` will peeks this injected parameters and possibly exclude them from the sequence match
 
 this is only done for character level parsers where the selector is used to rewrite the `many` selector in a way that respects the injecting parser. Please note that `string` is a character level parser and it can _play_ with single character parsers.
 

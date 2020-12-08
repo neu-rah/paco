@@ -1,6 +1,6 @@
 {
   "name": "paco",
-  "version": "1.0.19",
+  "version": "1.0.20",
   "description": "Monadic Parser Combinators",
   "main": "paco.js",
   "scripts": {
