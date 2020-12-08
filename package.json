@@ -1,18 +1,16 @@
 {
   "name": "paco",
-  "version": "1.0.17",
+  "version": "1.0.18",
   "description": "Monadic Parser Combinators",
   "main": "paco.js",
   "scripts": {
-    "repl": "snit dev.js",
+    "repl": "snit",
     "dev": "node --debug=11967 dev.js",
     "test": "nyc mocha test/index.spec.js"
   },
   "author": "neu-rah",
   "license": "MIT",
-  "dependencies": {
-    "funjs": "git+https://github.com/neu-rah/funjs.git"
-  },
+  "dependencies": {},
   "devDependencies": {
     "nyc": "^15.1.0"
   },

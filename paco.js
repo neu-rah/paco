@@ -22,6 +22,7 @@ patchPrimitives(
   Function().__proto__,
   String().__proto__,
   Array().__proto__,
+  Object().__proto__,
 )
 
 //////////////////////////////////////////////////////////
@@ -40,13 +41,14 @@ const quickParam=p=>typeof p === "string" ? (p.length === 1 ? char(p) : string(p
 
 class Parser extends Function {
   constructor() {
-    super('...args', 'return this.__self__._parse(...args)')
+    super('...args', 'return this.__self__.run(...args)')
     var self=this.bind(this)
     this.__self__=self
     return self
   }
-  // _run(...args){return this._parse(...args)}
+  // _run(...args){return this.run(...args)}
   level() {return 0}
+  highOrder() {return false}
   setEx(ex) {return this}
   parse(s) {return this(Pair(s, []))}
   post(f) {}
@@ -64,6 +66,7 @@ class Parser extends Function {
       this.target=o
     }
     level() {return this.target.level()+1}
+    highOrder() {return this.target.highOrder()}
   }
   //chain this parser to another
   static Chain=class Chain extends Parser.Link {
@@ -76,31 +79,48 @@ class Parser extends Function {
   static Exclusive=class Exclusive extends Parser.Chain {
     constructor(o,p) {
       super(o,p)
-      if(p.level()===0) {
+      if(!p.highOrder()) {
         this.target=o.setEx(this)
-        if(!this.target) throw new Error("should not be undefined")
+        // if(!this.target) throw new Error("should not be undefined")
       }
     }
     setEx(ex) {return this}
   }
+
   static Post=class Post extends Parser.Link {
     constructor(o,f) {
       super(o)
       this.func=f
     }
     get expect() {return "["+this.target.expect+"]->Post process"}
-    _parse(io) {return this.func(this.target(io))}
+    run(io) {return this.func(this.target(io))}
   }
   post(f) {return new Parser.Post(this,f)}
+
+  static Verify=class Verify extends Parser.Link {
+    constructor(o,f,m) {
+      super(o)
+      this.func=f
+      this.msg=m
+    }
+    get expect() {return "["+this.target.expect+"]->verify!"}
+    run(io) {
+      const r=this.target(io)
+      if(isLeft(r)||this.func(fromRight(r).snd())) return r
+      return Left(Pair(io.fst(),new Error(this.msg)))
+    }
+  }
+  verify(f,m) {return new Parser.Verify(this,f,m)}
+
   static Then=class Then extends Parser.Exclusive {
     get expect() {return this.target.expect+"\nthen "+this.next.expect}
-    _parse(io) {return io.mbind(this.target).mbind(this.next)}
+    run(io) {return io.mbind(this.target).mbind(this.next)}
   }
   then(p) {return new Parser.Then(this,p)}
 
   static Skip=class Skip extends Parser.Exclusive {
     get expect() {return this.target.expect+"\nskip "+this.next.expect}
-    _parse(io) {
+    run(io) {
       const os=io.mbind(this.target)
       return os.mbind(this.next).map(map(o=>snd(fromRight(os))))
     }
@@ -109,7 +129,7 @@ class Parser extends Function {
 
   static LookAhead=class LookAhead extends Parser.Exclusive {
     get expect() {return this.target.expect+" but look ahead for "+this.next.expect}
-    _parse(io) {
+    run(io) {
       const r=this.target(io)
       const ps=r.mbind(this.next)
       if (isLeft(ps)) return ps
@@ -120,7 +140,7 @@ class Parser extends Function {
 
   static Excluding=class Excluding extends Parser.Exclusive {
     get expect() {return this.target.expect+" excluding "+this.next.expect}
-    _parse(io) {
+    run(io) {
       const ps=this.next(io)
       if (isRight(ps)) return Left(Pair(io.fst(), new Expect(this.expect)))
       return this.target(io)
@@ -131,7 +151,7 @@ class Parser extends Function {
   static NotFollowedBy=class NotFollowedBy extends Parser.Chain {
     get expect() {return this.target.expect+" excluding "+this.next.expect}
     setEx(ex) {return new Parser.NotFollowedBy(this.target.setEx(ex),this.msg)}
-    _parse(io) {
+    run(io) {
       const os=this.target(io)
       const ps=os.mbind(this.next)
       return isLeft(ps) ? os : Left(Pair(io.fst(), new Expect(this.expect)))
@@ -142,7 +162,7 @@ class Parser extends Function {
   static Or=class Or extends Parser.Chain {
     get expect() {return this.target.expect+" or "+this.next.expect}
     setEx(ex) {return new Parser.Or(this.target.setEx(ex),this.next)}
-    _parse(io) {
+    run(io) {
       const r=this.target(io)
       if (isRight(r)) return r;//break `or` parameter expansion
       return r.or(this.next(io)).or(Left(Pair(io.fst(), new Expect(this.expect))))
@@ -157,7 +177,7 @@ class Parser extends Function {
     }
     get expect() {return this.msg}
     setEx(ex) {return new Parser.FailMsg(this.target.setEx(ex),this.msg)}
-    _parse(io) {
+    run(io) {
       return this.target(io).or(Left(Pair(io.fst(), new Error(this.msg))))
     }
   }
@@ -176,7 +196,7 @@ class Parser extends Function {
       }
       return "("+this.target.expect+")->as("+xfname(this.func)+")"
     }
-    _parse(io) {
+    run(io) {
       return Pair(io.fst(),[])
         .mbind(this.target)
         .map(map(this.func))
@@ -192,13 +212,41 @@ class Parser extends Function {
     }
     setEx(ex) {return new Parser.Join(this.target.setEx(ex),this.func)}
     get expect() {return typeof p === "undefined" ? "("+this.target.expect+")->join()" : "("+this.target.expect+")->join(\""+this.func+"\")"}
-    _parse(io) {
-      return typeof p === "undefined" ? 
+    run(io) {
+      return typeof this.func === "undefined" ? 
         this.target.as(mconcat)(io) : 
         this.target.as(o=>o.join(this.func))(io)   
     }
   }
   join(p) {return new Parser.Join(this,p)}
+
+  static To=class To extends Parser.Link {
+    constructor(o,tag) {
+      super(o)
+      this.tag=tag
+    }
+    setEx(ex) {return new Parser.To(this.target.setEx(ex),this.tag)}
+    get expect() {return "("+this.target.expect+")->tagged as(\""+this.tag+"\")"}
+    run(io) {
+      const mktag=lr=>{
+        // if(isLeft(r)) return r
+        const fr=fromRight(lr)
+        const r=fr.snd()
+        const i=r.length===1?r[0]:r
+        if(typeof io.snd().last()==="object") {
+          io.snd().last()[this.tag]=i//no copy, modify object
+          return Right(Pair(fr.fst(),io.snd()))
+        }
+        const ro={}
+        ro[this.tag]=i
+        r[r.length-1]=ro
+        return Right(Pair(fr.fst(),io.snd().append(r)))
+      }
+      const r=this.target.post(mktag)(Pair(io.fst(),[]))
+      return r
+    }
+  }
+  to(tag) {return new Parser.To(this,tag)}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -211,7 +259,7 @@ class None extends Parser {
     super()
   }
   get expect() {return "none"}
-  _parse(io) {return Right(io)}
+  run(io) {return Right(io)}
 }
 //parser always succeedes without consuming
 // also an "id" combinator to apply continuations on root elements
@@ -222,7 +270,7 @@ class Skip extends Parser.Link {
     super(p)
   }
   get expect() {return "skip "+this.target.expect}
-  _parse(io) {return none.skip(this.target)(io)}
+  run(io) {return none.skip(this.target)(io)}
 }
 //apply skip (continuation) to the root element, using `none` combinator
 const skip=o=>new Skip(o)
@@ -233,7 +281,7 @@ class Satisfy extends Parser {
     this.ch=chk
   }
   get expect() {return this.ch.expect || "to satisfy condition"}
-  _parse(io) {
+  run(io) {
     return this.ch(head(io.fst())) ?
       Right(//success...
         Pair(//build a pair of remaining input and composed output
@@ -253,7 +301,7 @@ class Str extends Parser {
     this.str=str
   }
   get expect() {return "string `"+this.str+"`"}
-  _parse(io) {
+  run(io) {
     return io.fst().startsWith?(
       io.fst().startsWith(this.str)?
         Right(Pair(io.fst().substr(this.str.length),io.snd().append(this.str))):
@@ -270,7 +318,7 @@ class Regex extends Parser {
     this.expr=e
   }
   get expect() {return "regex /"+this.expr+"/"}
-  _parse(io) {
+  run(io) {
     const r=io.fst().match(this.expr)
     return r === null ?
       Left(Pair(io.fst(), new Expect(this.expect))) :
@@ -308,8 +356,9 @@ const eof=skip(satisfy(isEof))
 //meta-parsers ans parser compositions/alias
 class Meta extends Parser.Link {
   level() {return 2}
-  _parse(io){return this.target(io)}
+  run(io){return this.target(io)}
   setEx(ex) {return this}
+  highOrder() {return true}
 }
 const optional=p=>new Meta(io=>p(io).or(Right(io))).failMsg("optional "+p.expect)//never fails
 
@@ -318,8 +367,9 @@ const choice=ps=>foldl1(a=>b=>a.or(b))(ps)
 class Many extends Parser.Link {
   get expect() {return "many("+this.target.expect+")"}//never fails
   level() {return 2}
+  highOrder() {return true}
   setEx(ex) {
-    if(ex.next.level()!==0) throw new Error("expecting character level parser here")
+    if(ex.next.highOrder()) throw new Error("expecting character level parser here")
     switch(ex.constructor.name) {
       case "Excluding": return many(this.target.excluding(ex.next))
       case "LookAhead": return many(this.target.lookAhead(ex.next))
@@ -327,7 +377,7 @@ class Many extends Parser.Link {
         return many(this.target.excluding(ex.next).or(this.target.lookAhead(ex.next)))
     }
   }
-  _parse(io) {
+  run(io) {
     return this.target.then(many(this.target))(io).or(Right(io))
   }
 }
@@ -346,7 +396,7 @@ const count=curry((n,p)=>new Meta(
 const between=curry((open,close,p)=>skip(open).then(p).skip(close))
 
 const option=curry((x, p)=>new Meta(
-  io=>p(io).or(Right(Pair(io.fst(), x)))
+  io=>p(io).or(Right(Pair(io.fst(), [x])))
 ).failMsg("option "+p.expect+" else "+x))
 
 const optionMaybe=p=>new Meta(
@@ -466,4 +516,21 @@ exports.Meta=Meta
 // exports.chrono=chrono
 // exports.time=time
 
-res(">")(digits1.join().then(string("ok")).then(digits.join()).then(eof).parse(SStr("123ok987787")))
+// res(">")(digits1.join().then(string("ok")).then(digits.join()).then(eof).parse(SStr("123ok987787")))
+
+// const t=
+//   string("temp: ")
+//   .then(
+//     option("",oneOf("-+")).to("sgn")
+//     .then(digits.join().as(parseInt).to("nr"))
+//     .then(char('K').to("unit"))
+//     .verify(o=>o[1].sgn!=="-","negative Kelvin!")
+//   )
+// clog(res(">")(t.parse("temp: +12K")))
+
+// clog(res(">")(letters.join().then(digits.join().to("ok")).parse("as123")))
+// clog(res(">")(letters.join().to("text").then(digits.join().to("nr")).parse("as123")))
+
+// parse(">")(many(digit).join())("")
+
+optional(none).highOrder()

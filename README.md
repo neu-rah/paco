@@ -13,7 +13,7 @@ parse(">")(myParser)("#AN-123")
 ```
 outputs:
 ```javascript
-TC_Right { value: [ 'AN', 123 ] }
+Right { value: [ 'AN', 123 ] }
 ```
 
 All parsers can chain up or group to form other parsers that still can chain up and group.
@@ -32,7 +32,7 @@ Some parsers are already a composition with metaparsers, that is the case of `di
 **It's now possible to parse this:**
 ```javascript
 #>digits.join().as(parseInt).then(digit).parse("1234")
-TC_Right { value: TC_Pair { a: '', b: [ 123, '4' ] } }
+Right { value: Pair { a: '', b: [ 123, '4' ] } }
 ```
 `.then`, `.skip` and others inject exclusion check on the chain at construction time.
 We allow the parser base to be re-writen at construction time, keeping away all checking at parse time.
@@ -121,7 +121,7 @@ testing a simple parser
 
 ```javascript
 #>digits(Pair("123",[]))
-TC_Right { value: TC_Pair { a: '', b: [ '1', '2', '3' ] } }
+Right { value: Pair { a: '', b: [ '1', '2', '3' ] } }
 ```
 This is the basic form of parsing (feeding a parser). 
 
@@ -129,13 +129,13 @@ However a `parse` function is available, it will perform as the former but gives
 
 ```javascript
 #>parse(">")(digits)("123")
-TC_Right { value: [ '1', '2', '3' ] }
+Right { value: [ '1', '2', '3' ] }
 ```
 Same with
 
 ```javascript
 #>digits.parse("123")
-TC_Right { value: TC_Pair { a: '', b: [ '1', '2', '3' ] } }
+Right { value: Pair { a: '', b: [ '1', '2', '3' ] } }
 ```
 
 the only difference is that this last one, as the first will give full output, including the input state.
@@ -146,7 +146,7 @@ this parse will fail as it expects at least one digit
 
 ```javascript
 #>parse(">")(many1(digit))("#123")
-TC_Left { value: 'error, expecting digit but found `#` here->#123' }
+Left { value: 'error, expecting digit but found `#` here->#123' }
 ```
 ## Composition examples
 
@@ -161,7 +161,7 @@ TC_Left { value: 'error, expecting digit but found `#` here->#123' }
 
 expected result
 ```javascript
-+TC_Right { value: [ 'As-armas-e-os-baroes' ] }
++Right { value: [ 'As-armas-e-os-baroes' ] }
 ```
 
 ```javascript
@@ -180,7 +180,7 @@ const nr=
 
 expected result
 ```javascript
-TC_Right { value: [ 151 ] }
+Right { value: [ 151 ] }
 ```
 
 ## Parsers classes inheritance map
@@ -256,7 +256,7 @@ Parser
 
 ```javascript
 #>parse(">")(regex("#([a-zA-Z]+)[ -]([0-9]+)"))("#an-123...")
-TC_Right { value: [ 'an', '123' ] }
+Right { value: [ 'an', '123' ] }
 ```
 
 - **skip(...)** ignore the group/parser output
@@ -278,18 +278,18 @@ Be sure to exclude the delimiters from the content or provide any other meaning 
 
 ```javascript
 #>parse(">")(between(space)(many1(noneOf(" ")))(space).join())(" ab.12 ")
-TC_Right { value: [ 'ab.12' ] }
+Right { value: [ 'ab.12' ] }
 ```
 
 - **option(x)(p)** parses `p` or returns `x` if it fails, this parser never fails.
 
 ```javascript
 #>parse(">")(option(["0"])(digit))("1")
-TC_Right { value: [ '1' ] }
+Right { value: [ '1' ] }
 #>parse(">")(option(["0"])(digit))("")
-TC_Right { value: [ '0' ] }
+Right { value: [ '0' ] }
 #>parse(">")(option(["0"])(digit))("#")
-TC_Right { value: [ '0' ] }
+Right { value: [ '0' ] }
 ```
 
 - **optionMaybe(p)** parse `p` and returns `Just` the result or `Nothing` if it fails, this parser never fails
@@ -322,32 +322,32 @@ Right . id
 
 ```javascript
 #>parse(">")(letter.or(digit))("1")
-TC_Right { value: [ '1' ] }
+Right { value: [ '1' ] }
 #>parse(">")(letter.or(digit))("a")
-TC_Right { value: [ 'a' ] }
+Right { value: [ 'a' ] }
 #>parse(">")(letter.or(digit))("#123")
-TC_Left {
+Left {
   value: 'error, expecting letter or digit but found `#` here->#123' }
 ```
 
 direct parse
 ```javascript
 #>letter.or(digit).parse("1")
-TC_Right { value: TC_Pair { a: '', b: [ '1' ] } }
+Right { value: Pair { a: '', b: [ '1' ] } }
 #>letter.or(digit).parse("a")
-TC_Right { value: TC_Pair { a: '', b: [ 'a' ] } }
+Right { value: Pair { a: '', b: [ 'a' ] } }
 #>letter.or(digit).parse("#123")
-TC_Left { value: TC_Pair { a: '#123', b: 'letter or digit' } }
+Left { value: Pair { a: '#123', b: 'letter or digit' } }
 ```
 
 desugared parse
 ```javascript
 #>letter.or(digit)(Pair("1",[]))
-TC_Right { value: TC_Pair { a: '', b: [ '1' ] } }
+Right { value: Pair { a: '', b: [ '1' ] } }
 #>letter.or(digit)(Pair("a",[]))
-TC_Right { value: TC_Pair { a: '', b: [ 'a' ] } }
+Right { value: Pair { a: '', b: [ 'a' ] } }
 #>letter.or(digit)(Pair("#123",[]))
-TC_Left { value: TC_Pair { a: '#123', b: 'letter or digit' } }
+Left { value: Pair { a: '#123', b: 'letter or digit' } }
 ```
 
 - **res(r)** 
@@ -356,12 +356,12 @@ process a parser return to produce a result or error message, discarding input s
 
 ```javascript
 #>res(">")(letter.then(digits).parse("123"))
-TC_Left { value: '>error, expecting letter but found `1` here->1...' }
+Left { value: '>error, expecting letter but found `1` here->1...' }
 ```
 without `res()` procesing
 ```javascript
 #>letter.then(digits).parse("123")
-TC_Left { value: TC_Pair { a: '123', b: 'letter' } }
+Left { value: Pair { a: '123', b: 'letter' } }
 ```
 
 - **.expect**
@@ -391,5 +391,5 @@ console.log(parse(">")(p)("#AN-123"))
 ```
 result:
 ```javascript
-TC_Right { value: [ 'AN', 123 ] }
+Right { value: [ 'AN', 123 ] }
 ```

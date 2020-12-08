@@ -27,6 +27,7 @@ patchPrimitives(
   Function().__proto__,
   String().__proto__,
   Array().__proto__,
+  Object().__proto__,
 )
 
 const {
