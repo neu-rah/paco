@@ -51,7 +51,7 @@ const kchk=
 Right { value: [ 'temp: ', { temp: 12, unit: 'K' } ] }
 ```
 
-this, along `.verify` and `.as` allow event callbacks and all sort of automation during the parsing, if not then let me know.
+this, along `.verify`, `.post` and `.as` allow event callbacks and all sort of automation during the parsing, if not then let me know.
 
 **It's now possible to parse this:**
 ```javascript
@@ -185,18 +185,18 @@ Left { value: 'error, expecting digit but found `#` here->#123' }
 
 expected result
 ```javascript
-+Right { value: [ 'As-armas-e-os-baroes' ] }
+Right { value: [ 'As-armas-e-os-baroes' ] }
 ```
 
 ```javascript
 const nr=
   skip(spaces)
-  .then(digits).join("").as(o=>o*1)//get first digits as number
+  .then(digits).join().as(parseInt)//get first digits as number
   .then(many(//then seek many separated by `,`
     skip(spaces)
     .skip(char(',').or(char('|')))//drop the separator (not included in output)
     .skip(spaces)
-    .then(digits.join("").as(o=>o*1))
+    .then(digits.join().as(parseInt))
   )).as(foldr1(a=>b=>a+b))//transform output by summing all values
 
   parse(">")(nr)(" 123 , 25 | 3")

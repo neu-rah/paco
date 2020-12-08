@@ -38,7 +38,7 @@ const {
   Point, Set, Range,
 }=require("./src/primitives")
 
-const prim=require("./src/primitives")
+// const prim=require("./src/primitives")
 
 const quickParam=p=>typeof p === "string" ? (p.length === 1 ? char(p) : string(p)) : p
 
@@ -125,7 +125,7 @@ class Parser extends Function {
     get expect() {return this.target.expect+"\nthen "+this.next.expect}
     run(io) {return io.mbind(this.target).mbind(this.next)}
   }
-  then(p) {return new Parser.Then(this,p)}
+  then(p) {return new Parser.Then(this,quickParam(p))}
 
   static Skip=class Skip extends Parser.Exclusive {
     get expect() {return this.target.expect+"\nskip "+this.next.expect}
@@ -134,7 +134,7 @@ class Parser extends Function {
       return os.mbind(this.next).map(map(o=>snd(fromRight(os))))
     }
   }
-  skip(p) {return new Parser.Skip(this,p)}
+  skip(p) {return new Parser.Skip(this,quickParam(p))}
 
   static LookAhead=class LookAhead extends Parser.Exclusive {
     get expect() {return this.target.expect+" but look ahead for "+this.next.expect}
@@ -145,7 +145,7 @@ class Parser extends Function {
       return r
     }
   }
-  lookAhead(p) {return new Parser.LookAhead(this,p)}
+  lookAhead(p) {return new Parser.LookAhead(this,quickParam(p))}
 
   static Excluding=class Excluding extends Parser.Exclusive {
     get expect() {return this.target.expect+" excluding "+this.next.expect}
@@ -156,7 +156,7 @@ class Parser extends Function {
       return this.target(io)
     }
   }
-  excluding(p) {return new Parser.Excluding(this,p)}
+  excluding(p) {return new Parser.Excluding(this,quickParam(p))}
 
   static NotFollowedBy=class NotFollowedBy extends Parser.Chain {
     get expect() {return this.target.expect+" excluding "+this.next.expect}
@@ -168,7 +168,7 @@ class Parser extends Function {
       return isLeft(ps) ? os : Left(Pair(io.fst(), new Expect(this.expect)))
     }
   }
-  notFollowedBy(p) {return new Parser.NotFollowedBy(this,p)}
+  notFollowedBy(p) {return new Parser.NotFollowedBy(this,quickParam(p))}
 
   static Or=class Or extends Parser.Chain {
     get expect() {return this.target.expect+" or "+this.next.expect}
@@ -179,7 +179,7 @@ class Parser extends Function {
       return r.or(this.next(io)).or(Left(Pair(io.fst(), new Expect(this.expect))))
     }
   }
-  or(p) {return new Parser.Or(this,p)}
+  or(p) {return new Parser.Or(this,quickParam(p))}
 
   static  FailMsg=class FailMsg extends Parser.Link {
     constructor(o,msg) {
@@ -284,7 +284,7 @@ class Skip extends Parser.Link {
   run(io) {return none.skip(this.target)(io)}
 }
 //apply skip (continuation) to the root element, using `none` combinator
-const skip=o=>new Skip(o)
+const skip=o=>new Skip(quickParam(o))
 
 class Satisfy extends Parser {
   constructor(chk) {
@@ -519,18 +519,19 @@ exports.Meta=Meta
 
 // exports.maps=maps
 
-// const chrono=(p,cnt)=>{
-//   const start=new Date()
-//   for(var n=cnt;n;n--) p()
-//   const end=new Date()
-//   const elapsed=end-start
-//   const avg=elapsed/cnt
-//   console.log(avg/1000,"s")
-//   return avg
-// }
+const chrono=(p,cnt,quiet)=>{
+  clog(".")
+  const start=new Date()
+  for(var n=cnt;n;n--) p()
+  const end=new Date()
+  const elapsed=end-start
+  const avg=elapsed/cnt
+  if(!quiet)console.log(avg/1000,"s")
+  return avg
+}
 
-// const time=p=>io=>chrono(()=>p.parse(io),100)
+const time=(p,n,q)=>io=>chrono(()=>p.parse(io),n||1,q)
 
-// exports.chrono=chrono
-// exports.time=time
+exports.chrono=chrono
+exports.time=time
 

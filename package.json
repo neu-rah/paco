@@ -1,6 +1,6 @@
 {
-  "name": "paco",
-  "version": "1.0.20",
+  "name": "rsite-paco",
+  "version": "1.0.21",
   "description": "Monadic Parser Combinators",
   "main": "paco.js",
   "scripts": {

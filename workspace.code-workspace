@@ -5,9 +5,7 @@
 		}
 	],
 	"settings": {
-		"files.exclude": {
-			"workspace.code-workspace": false
-		},
-		"workspace.isHidden": false
+		"files.exclude": {},
+		"workspace.isHidden": true
 	}
 }

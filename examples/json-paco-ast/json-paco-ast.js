@@ -130,7 +130,7 @@ if(process.argv[2]){
 {
   console.log("paco JSON parse")
   const start=new Date()
-  console.log(parseFile("/home/azevedo/code/nodes/paco/examples/json-paco-ast/ex4.json"))
+  console.log(parseFile("/home/azevedo/code/nodes/paco/examples/json-paco-ast/ex1.json"))
   const end=new Date()
   console.log((end-start)/1000,"s")
 }
