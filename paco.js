@@ -49,9 +49,7 @@ class Parser extends Function {
   level() {return 0}
   setEx(ex) {return this}
   parse(s) {return this(Pair(s, []))}
-  // post(f) {return parserOf
-  //   (this.expect+" verify of "+f)
-  //   (io=>f(this(io)))}
+  post(f) {}
   // chk(m,f) {return parserOf(this.expect+" check of "+f)
   //   (io=>{
   //     const r=this.failMsg(m)(io)
@@ -85,6 +83,15 @@ class Parser extends Function {
     }
     setEx(ex) {return this}
   }
+  static Post=class Post extends Parser.Link {
+    constructor(o,f) {
+      super(o)
+      this.func=f
+    }
+    get expect() {return "["+this.target.expect+"]->Post process"}
+    _parse(io) {return this.func(this.target(io))}
+  }
+  post(f) {return new Parser.Post(this,f)}
   static Then=class Then extends Parser.Exclusive {
     get expect() {return this.target.expect+"\nthen "+this.next.expect}
     _parse(io) {return io.mbind(this.target).mbind(this.next)}
@@ -296,7 +303,7 @@ const tab=satisfy(isTab).failMsg("tab")
 const nl=satisfy(is_nl).failMsg("new-line")
 const cr=satisfy(is_cr).failMsg("carriage return")
 const blank=satisfy(isBlank)
-const eof=satisfy(isEof)
+const eof=skip(satisfy(isEof))
 
 //meta-parsers ans parser compositions/alias
 class Meta extends Parser.Link {
