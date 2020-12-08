@@ -10,8 +10,9 @@ patchPrimitives(
   Object().__proto__,
 )
 
-const chkOf=e=>f=>{
+const chkOf=e=>(f,canFail)=>{
   f.expect=e
+  f.canFail=typeof canFail==="undefined"?true:canFail
   f.minus=o=>chkOf(f.expect+" minus "+o.expect)(p=>any(p)&&not(o)(p))
   return f
 }
@@ -20,7 +21,7 @@ const neg=f=>(...o)=>!f(o)
 
 const expect=o=>o.expect
 
-const any=chkOf("any character")(o=>typeof o!=="undefined")
+const any=chkOf("any character")(o=>typeof o!=="undefined",false)
 const is=c=>chkOf("character '"+c+"'")(o=>o===c)
 const oneOf=s=>chkOf("one of \""+s+"\"")(o=>s.indexOf(o)!=-1)
 const noneOf=s=>not(oneOf(s))
@@ -30,7 +31,7 @@ const match=
   (...oo)=>chkOf("match "+map(expect)(oo).join(" or "))
   (o=>foldr(f=>a=>a||f(o),false,oo))
 
-  const digit=chkOf("digit")(range('0','9'))
+const digit=chkOf("digit")(range('0','9'))
 const lower=chkOf("lowercase letter")(range('a','z'))
 const upper=chkOf("lowercase letter")(range('A','Z'))
 const letter=chkOf("letter")(o=>lower(o)||upper(o))

@@ -4,5 +4,10 @@
 			"path": "."
 		}
 	],
-	"settings": {}
+	"settings": {
+		"files.exclude": {
+			"workspace.code-workspace": false
+		},
+		"workspace.isHidden": false
+	}
 }

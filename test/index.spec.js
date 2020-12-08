@@ -217,7 +217,7 @@ describe("Metaparsers",function() {
     )
   })
   it("option",async ()=>{
-    const parsing=parse(">")(option(["0"])(digit))
+    const parsing=parse(">")(option("0")(digit))
     assert.deepStrictEqual(
       parsing("1"),
       Right(["1"]),"option match"

@@ -1,5 +1,8 @@
  "use strict";
 
+ // we depend on:
+ //funjs from https://github.com/neu-rah/funjs
+
 const { log, clog, xlog, debuging }=require("./src/debug")
 const { Msg, Expect, Error }=require("./src/error")
 const { SStr }=require("./src/strstr.js")
@@ -47,8 +50,9 @@ class Parser extends Function {
     return self
   }
   // _run(...args){return this.run(...args)}
-  level() {return 0}
+  //level() {return 0}
   highOrder() {return false}
+  canFail() {return false}
   setEx(ex) {return this}
   parse(s) {return this(Pair(s, []))}
   post(f) {}
@@ -65,8 +69,9 @@ class Parser extends Function {
       super()
       this.target=o
     }
-    level() {return this.target.level()+1}
+    //level() {return this.target.level()+1}
     highOrder() {return this.target.highOrder()}
+    canFail() {return this.target.canFail()}
   }
   //chain this parser to another
   static Chain=class Chain extends Parser.Link {
@@ -74,7 +79,9 @@ class Parser extends Function {
       super(o)
       this.next=p
     }
-    level() {return this.target.level()+1}
+    //level() {return this.target.level()+1}
+    highOrder() {return this.target.highOrder()||this.next.highOrder()}
+    canFail() {return this.target.canFail()||this.next.canFail()}
   }
   static Exclusive=class Exclusive extends Parser.Chain {
     constructor(o,p) {
@@ -140,6 +147,7 @@ class Parser extends Function {
 
   static Excluding=class Excluding extends Parser.Exclusive {
     get expect() {return this.target.expect+" excluding "+this.next.expect}
+    canFail() {return this.target.canFail()||!this.next.canFail()}
     run(io) {
       const ps=this.next(io)
       if (isRight(ps)) return Left(Pair(io.fst(), new Expect(this.expect)))
@@ -151,6 +159,7 @@ class Parser extends Function {
   static NotFollowedBy=class NotFollowedBy extends Parser.Chain {
     get expect() {return this.target.expect+" excluding "+this.next.expect}
     setEx(ex) {return new Parser.NotFollowedBy(this.target.setEx(ex),this.msg)}
+    canFail() {return this.target.canFail()||!this.next.canFail()}
     run(io) {
       const os=this.target(io)
       const ps=os.mbind(this.next)
@@ -281,6 +290,7 @@ class Satisfy extends Parser {
     this.ch=chk
   }
   get expect() {return this.ch.expect || "to satisfy condition"}
+  canFail() {return this.ch.canFail}
   run(io) {
     return this.ch(head(io.fst())) ?
       Right(//success...
@@ -355,18 +365,24 @@ const eof=skip(satisfy(isEof))
 
 //meta-parsers ans parser compositions/alias
 class Meta extends Parser.Link {
-  level() {return 2}
+  constructor(iofunc,noFail) {
+    super(iofunc)
+    this.noFail=typeof noFail==="undefined"?true:noFail
+  }
+  //level() {return 2}
   run(io){return this.target(io)}
   setEx(ex) {return this}
-  highOrder() {return true}
+  canFail() {return !this.noFail}
+  highOrder() {return this.noFail}
 }
-const optional=p=>new Meta(io=>p(io).or(Right(io))).failMsg("optional "+p.expect)//never fails
+const optional=p=>new Meta(io=>p(io).or(Right(io))).failMsg("optional "+p.expect,true)//never fails
 
 const choice=ps=>foldl1(a=>b=>a.or(b))(ps)
 
 class Many extends Parser.Link {
   get expect() {return "many("+this.target.expect+")"}//never fails
-  level() {return 2}
+  //level() {return 2}
+  canFail() {return false}
   highOrder() {return true}
   setEx(ex) {
     if(ex.next.highOrder()) throw new Error("expecting character level parser here")
@@ -386,31 +402,31 @@ const many=p=>new Many(p)
 const many1=p=>(p.then(many(p))).failMsg("at least one "+p.expect)
 
 const manyTill=curry((p,e)=>new Meta(
-  io=>p.excluding(e).then(manyTill(p,e))(io).or(Right(io))
+  io=>p.excluding(e).then(manyTill(p,e))(io).or(Right(io)),true
 ).failMsg("many "+p.expect+" until "+e.expect))//never fails
 
 const count=curry((n,p)=>new Meta(
-  io=>n ? p.then(count(n-1,p))(io) : Right(io)
+  io=>n ? p.then(count(n-1,p))(io) : Right(io),!p.canFail()
 ).failMsg(n+" of "+p.expect))
 
 const between=curry((open,close,p)=>skip(open).then(p).skip(close))
 
 const option=curry((x, p)=>new Meta(
-  io=>p(io).or(Right(Pair(io.fst(), [x])))
-).failMsg("option "+p.expect+" else "+x))
+  io=>p(io).or(Right(Pair(io.fst(), [x]))),true
+).failMsg("option "+p.expect+" else "+x))//never fails
 
 const optionMaybe=p=>new Meta(
-  io=>p.as(Just)(io).or(Right(Pair(io.fst(), Nothing())))
-).failMsg("maybe "+p.expect)
+  io=>p.as(Just)(io).or(Right(Pair(io.fst(), Nothing()))),true
+).failMsg("maybe "+p.expect)//never fails
 
 const sepBy=curry((p, sep)=> new Meta(
-  io=>p.then(many(skip(sep).then(p)))(io).or(Right(io))
+  io=>p.then(many(skip(sep).then(p)))(io).or(Right(io)),true
 ).failMsg(p.expect+" separated by "+sep.expect))//never fails
 
 const sepBy1=curry((p,sep)=>p.then(many(skip(sep).then(p))).failMsg(p.expect+" separated by "+sep.expect))
 
-const endBy=curry((p,sep)=>new Meta(
-  io=>sepBy(p)(sep).then(skip(sep))(io).or(Right(io))
+const endBy=curry((p,sep)=>new Meta(//TODO: review this, can not use sepBy
+  io=>sepBy(p)(sep).then(skip(sep))(io).or(Right(io)),!(sep.canFail()||p.canFail())
 ).failMsg(p.expect+" separated and ending with "+sep.expect))
 
 const endBy1=curry((p,sep)=>sepBy1(p)(sep).then(skip(sep)).failMsg("at least one of "+p.expect+" separated and ending with "+sep.expect))
@@ -533,4 +549,5 @@ exports.Meta=Meta
 
 // parse(">")(many(digit).join())("")
 
-optional(none).highOrder()
+// optional(none).highOrder()
+clog(digits.join().then(none.notFollowedBy(none)).parse("1232344"))
