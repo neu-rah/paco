@@ -343,9 +343,10 @@ const caseInsensitive=str=>new Meta(
 class Regex extends Parser {
   constructor(e) {
     super()
-    this.expr=e
+    this.expr=RegExp(e,"y")
+    this.expr.lastIndex=0
   }
-  get expect() {return "regex /"+this.expr+"/"}
+  get expect() {return "regex "+this.expr}
   run(io) {
     const r=io.fst().match(this.expr)
     return r === null ?
