@@ -10,9 +10,10 @@ patchPrimitives(
   Object().__proto__,
 )
 
-const chkOf=e=>(f,canFail)=>{
+const chkOf=e=>(f,canFail,consumes)=>{
   f.expect=e
   f.canFail=typeof canFail==="undefined"?true:canFail
+  f.consumes=typeof consumes==="undefined"?true:consumes
   f.minus=o=>chkOf(f.expect+" minus "+o.expect)(p=>any(p)&&not(o)(p))
   return f
 }
@@ -44,7 +45,8 @@ const tab=chkOf("tab")(is('\t'))
 const nl=chkOf("newline")(is('\n'))
 const cr=chkOf("carriage return")(is('\r'))
 const blank=chkOf("whitespace")(match(space,tab))
-const eof=chkOf("end of file")(o=>typeof o==="undefined")
+const eof=chkOf("end of file")(o=>typeof o==="undefined",true,false)
+const eol=chkOf("end of line or end of file")(o=>nl(o)||eof(o),true,false)
 
 // const m=match(range('a','z'),range('A','Z'),range('0','9'),is('#'),oneOf(".$"),noneOf("abcd"))
 
@@ -71,3 +73,4 @@ exports.is_nl=nl
 exports.is_cr=cr
 exports.isBlank=blank
 exports.isEof=eof
+exports.isEol=eol
