@@ -1,7 +1,7 @@
  "use strict";
 
  // we depend on:
- //funjs from https://github.com/neu-rah/funjs
+ //rsite-funjs from https://github.com/neu-rah/funjs
 
 const { log, clog, xlog, debuging }=require("./src/debug")
 const { Msg, Expect, Error }=require("./src/error")
@@ -19,7 +19,7 @@ const {
   Maybe, isMaybe, Nothing, isNothing, Just, isJust, fromJust,//Maybe
   isEither, Left, isLeft, fromLeft, Right, isRight, fromRight,//Either
   foldable, foldr, foldl, foldr1, foldl1, foldMap,//foldable
-}=require("funjs");
+}=require("rsite-funjs");
 
 patchPrimitives(
   Function().__proto__,

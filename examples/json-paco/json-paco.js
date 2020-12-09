@@ -14,7 +14,7 @@
 // }=require("paco");
 
 const fs=require("fs");
-const { isLeft, fromLeft, fromRight } = require("funjs");
+const { isLeft, fromLeft, fromRight } = require("rsite-funjs");
 const paco=require("../../paco");
 
 const unescaped=

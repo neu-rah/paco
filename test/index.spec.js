@@ -21,7 +21,7 @@ const {
   Maybe,isMaybe,Nothing,isNothing,Just,isJust,fromJust,//Maybe
   isEither,Left,isLeft,fromLeft,Right,isRight,fromRight,//Either
   foldable,foldr,foldl,foldr1,foldl1,foldMap,//foldable
-} = require("funjs");
+} = require("rsite-funjs");
 
 patchPrimitives(
   Function().__proto__,
