@@ -1,6 +1,6 @@
 {
   "name": "rsite-paco",
-  "version": "1.0.21",
+  "version": "1.0.22",
   "description": "Monadic Parser Combinators",
   "main": "paco.js",
   "scripts": {
@@ -10,7 +10,9 @@
   },
   "author": "neu-rah",
   "license": "MIT",
-  "dependencies": {},
+  "dependencies": {
+    "rsite-funjs": "^1.0.13"
+  },
   "devDependencies": {
     "nyc": "^15.1.0"
   },

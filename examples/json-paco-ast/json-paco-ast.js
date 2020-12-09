@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* PaCo JSON parser
  * RFC https://tools.ietf.org/html/rfc7159
- * just do a parse validation, no AST generated
+ * parse validate and build json object
  */
 
 const fs=require("fs");
@@ -119,18 +119,10 @@ if(process.argv[2]){
   console.log((end-start)/1000,"s")
 }
 
-// {
-//   console.log("native JSON.parse")
-//   const start=new Date()
-//   JSON.parse(fs.readFileSync("/home/azevedo/code/nodes/paco/examples/json-paco-ast/ex6.json","utf8"))
-//   const end=new Date()
-//   console.log((end-start)/1000,"s")
-// }
-
 {
   console.log("paco JSON parse")
   const start=new Date()
-  console.log(parseFile("/home/azevedo/code/nodes/paco/examples/json-paco-ast/ex1.json"))
+  console.log(parseFile("/home/azevedo/code/nodes/paco/examples/json-paco-ast/ex6.json"))
   const end=new Date()
   console.log((end-start)/1000,"s")
 }

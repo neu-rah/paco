@@ -23,6 +23,7 @@ const expect=o=>o.expect
 
 const any=chkOf("any character")(o=>typeof o!=="undefined",false)
 const is=c=>chkOf("character '"+c+"'")(o=>o===c)
+const cases=c=>chkOf("character '"+c+"'")(o=>o.toLowerCase()===c.toLowerCase())
 const oneOf=s=>chkOf("one of \""+s+"\"")(o=>s.indexOf(o)!=-1)
 const noneOf=s=>not(oneOf(s))
 const range=(a,z)=>chkOf("range '"+a+"' to '"+z+"'")(o=>a<=o&&o<=z)
@@ -53,6 +54,7 @@ if(!exports) var exports={}
 exports.isAnyChar=any
 exports.isNone=neg(any)
 exports.isChar=is
+exports.anyCase=cases
 exports.isOneOf=oneOf
 exports.isNoneOf=noneOf
 exports.inRange=range

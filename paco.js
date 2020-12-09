@@ -32,7 +32,7 @@ patchPrimitives(
 // Parser
 
 const {
-  isAnyChar, isChar, isOneOf, isNoneOf, inRange,
+  isAnyChar, isChar, anyCase, isOneOf, isNoneOf, inRange,
   isDigit, isLower, isUpper, isLetter, isAlphaNum, isHexDigit, isOctDigit,
   isSpace, isTab, is_nl, is_cr, isBlank, isEof,
   Point, Set, Range,
@@ -42,6 +42,9 @@ const {
 
 const quickParam=p=>typeof p === "string" ? (p.length === 1 ? char(p) : string(p)) : p
 
+const highOrder=o=>o.highOrder()
+const canFail=o=>o.canFail()
+
 class Parser extends Function {
   constructor() {
     super('...args', 'return this.__self__.run(...args)')
@@ -50,18 +53,12 @@ class Parser extends Function {
     return self
   }
   // _run(...args){return this.run(...args)}
-  //level() {return 0}
   highOrder() {return false}
   canFail() {return false}
+  root() {return this}
   setEx(ex) {return this}
   parse(s) {return this(Pair(s, []))}
   post(f) {}
-  // chk(m,f) {return parserOf(this.expect+" check of "+f)
-  //   (io=>{
-  //     const r=this.failMsg(m)(io)
-  //     if(isLeft(r)||f(fromRight(r).snd())) return r
-  //     return Left(Pair(io.fst(),new Error(m)))
-  //   })}
 
   //link something to this parser
   static Link=class Link extends Parser {
@@ -69,7 +66,6 @@ class Parser extends Function {
       super()
       this.target=o
     }
-    //level() {return this.target.level()+1}
     highOrder() {return this.target.highOrder()}
     canFail() {return this.target.canFail()}
   }
@@ -79,7 +75,6 @@ class Parser extends Function {
       super(o)
       this.next=p
     }
-    //level() {return this.target.level()+1}
     highOrder() {return this.target.highOrder()||this.next.highOrder()}
     canFail() {return this.target.canFail()||this.next.canFail()}
   }
@@ -222,7 +217,7 @@ class Parser extends Function {
       this.func=p
     }
     setEx(ex) {return new Parser.Join(this.target.setEx(ex),this.func)}
-    get expect() {return typeof p === "undefined" ? "("+this.target.expect+")->join()" : "("+this.target.expect+")->join(\""+this.func+"\")"}
+    get expect() {return typeof this.func === "undefined" ? "("+this.target.expect+")->join()" : "("+this.target.expect+")->join(\""+this.func+"\")"}
     run(io) {
       return typeof this.func === "undefined" ? 
         this.target.as(mconcat)(io) : 
@@ -258,6 +253,18 @@ class Parser extends Function {
     }
   }
   to(tag) {return new Parser.To(this,tag)}
+}
+
+//meta-parsers ans parser compositions/alias
+class Meta extends Parser.Link {
+  constructor(iofunc,noFail) {
+    super(iofunc)
+    this.noFail=typeof noFail==="undefined"?true:noFail
+  }
+  run(io){return this.target(io)}
+  setEx(ex) {return this}
+  canFail() {return !this.noFail}
+  highOrder() {return this.noFail}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -323,6 +330,10 @@ class Str extends Parser {
 }
 // //match a string
 const string=str=>new Str(str)
+// case-insensitive string match
+const caseInsensitive=str=>new Meta(
+  io=>(foldr1(a=>b=>b.then(a))(str.split("").map(o=>cases(o))).join())(io)
+).failMsg("non case-sensitive form of string `"+str+"`")
 
 class Regex extends Parser {
   constructor(e) {
@@ -348,6 +359,7 @@ const regex=e=>new Regex(e)
 // //character parsers
 const anyChar=satisfy(isAnyChar)
 const char=c=>satisfy(isChar(c))
+const cases=c=>satisfy(anyCase(c))
 const oneOf=cs=>satisfy(isOneOf(cs))
 const noneOf=cs=>satisfy(isNoneOf(cs))
 const range=curry((a, z)=>satisfy(inRange(a, z)))
@@ -365,25 +377,11 @@ const cr=satisfy(is_cr).failMsg("carriage return")
 const blank=satisfy(isBlank)
 const eof=skip(satisfy(isEof))
 
-//meta-parsers ans parser compositions/alias
-class Meta extends Parser.Link {
-  constructor(iofunc,noFail) {
-    super(iofunc)
-    this.noFail=typeof noFail==="undefined"?true:noFail
-  }
-  //level() {return 2}
-  run(io){return this.target(io)}
-  setEx(ex) {return this}
-  canFail() {return !this.noFail}
-  highOrder() {return this.noFail}
-}
 const optional=p=>new Meta(io=>p(io).or(Right(io))).failMsg("optional "+p.expect,true)//never fails
-
 const choice=ps=>foldl1(a=>b=>a.or(b))(ps)
 
 class Many extends Parser.Link {
   get expect() {return "many("+this.target.expect+")"}//never fails
-  //level() {return 2}
   canFail() {return false}
   highOrder() {return true}
   setEx(ex) {
@@ -494,6 +492,7 @@ exports.blanks1=blanks1
 exports.digits=digits
 exports.eof=eof
 exports.string=string
+exports.caseInsensitive=caseInsensitive
 exports.regex=regex
 
 exports.none=none
