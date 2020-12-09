@@ -3,7 +3,7 @@
  // we depend on:
  //rsite-funjs from https://github.com/neu-rah/funjs
 
-const { log, clog, xlog, debugging }=require("./src/debug")
+const { log, clog, xlog,mxlog, debugging }=require("./src/debug")
 const { Msg, Expect, Error }=require("./src/error")
 const { SStr }=require("./src/strstr.js")
 
@@ -45,12 +45,14 @@ const quickParam=p=>typeof p === "string" ? (p.length === 1 ? char(p) : string(p
 
 const highOrder=o=>o.highOrder()
 const canFail=o=>o.canFail()
+var uniqueId=0
 
 class Parser extends Function {
   constructor() {
     super('...args', 'return this.__self__.run(...args)')
     var self=this.bind(this)
     this.__self__=self
+    if(debugging) self.uniqueId=uniqueId++
     return self
   }
   // _run(...args){return this.run(...args)}
@@ -148,6 +150,7 @@ class Parser extends Function {
       return this.target.setEx(this)
       // return this
     }
+    get expect() {return this.target.expect+" then "+this.next.expect}
     safe() {return this.target.canFail()||this.next.consumes()}
     setEx(ex) {return thenPrefix?this.target.then(thenPrefix).then(this.next):this}
     run(io) {return io.mbind(this.target).mbind(this.next)}
