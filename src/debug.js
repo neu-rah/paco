@@ -1,6 +1,6 @@
 "use strict";
 
-const debuging=false
+const debuging=true
 
 if (debuging) console.log("DEBUG -------------")
 
