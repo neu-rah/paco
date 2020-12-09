@@ -68,6 +68,7 @@ class Parser extends Function {
     }
     highOrder() {return this.target.highOrder()}
     canFail() {return this.target.canFail()}
+    root() {return this.target.root?this.target.root():this}
   }
   //chain this parser to another
   static Chain=class Chain extends Parser.Link {
@@ -81,10 +82,10 @@ class Parser extends Function {
   static Exclusive=class Exclusive extends Parser.Chain {
     constructor(o,p) {
       super(o,p)
-      if(!p.highOrder()) {
+      // if(!p.highOrder()) { always send the exclusion si that target can decide
         this.target=o.setEx(this)
         // if(!this.target) throw new Error("should not be undefined")
-      }
+      // }
     }
     setEx(ex) {return this}
   }
@@ -133,6 +134,7 @@ class Parser extends Function {
 
   static LookAhead=class LookAhead extends Parser.Exclusive {
     get expect() {return this.target.expect+" but look ahead for "+this.next.expect}
+    root() {return this.target.root().lookAhead(this.next.root())}
     run(io) {
       const r=this.target(io)
       const ps=r.mbind(this.next)
@@ -144,6 +146,7 @@ class Parser extends Function {
 
   static Excluding=class Excluding extends Parser.Exclusive {
     get expect() {return this.target.expect+" excluding "+this.next.expect}
+    root() {return this.target.root().excluding(this.next.root())}
     canFail() {return this.target.canFail()||!this.next.canFail()}
     run(io) {
       const ps=this.next(io)
@@ -155,6 +158,7 @@ class Parser extends Function {
 
   static NotFollowedBy=class NotFollowedBy extends Parser.Chain {
     get expect() {return this.target.expect+" excluding "+this.next.expect}
+    root() {return this.target.root().notFollowedBy(this.next.root())}
     setEx(ex) {return new Parser.NotFollowedBy(this.target.setEx(ex),this.msg)}
     canFail() {return this.target.canFail()||!this.next.canFail()}
     run(io) {
@@ -167,6 +171,7 @@ class Parser extends Function {
 
   static Or=class Or extends Parser.Chain {
     get expect() {return this.target.expect+" or "+this.next.expect}
+    root() {return this.target.root().or(this.next.root())}
     setEx(ex) {return new Parser.Or(this.target.setEx(ex),this.next)}
     run(io) {
       const r=this.target(io)
@@ -385,13 +390,14 @@ class Many extends Parser.Link {
   canFail() {return false}
   highOrder() {return true}
   setEx(ex) {
-    if(ex.next.highOrder()) throw new Error("expecting character level parser here")
-    switch(ex.constructor.name) {
-      case "Excluding": return many(this.target.excluding(ex.next))
-      case "LookAhead": return many(this.target.lookAhead(ex.next))
-      default:
-        return many(this.target.excluding(ex.next).or(this.target.lookAhead(ex.next)))
-    }
+    // if(ex.next.highOrder()) throw new Error("expecting character level parser here")
+    if(!ex.next.root().highOrder())
+      switch(ex.constructor.name) {
+        case "Excluding": return many(this.target.excluding(ex.next))
+        case "LookAhead": return many(this.target.lookAhead(ex.next))
+        default:
+          return many(this.target.excluding(ex.next).or(this.target.lookAhead(ex.next)))
+      }
   }
   run(io) {
     return this.target.then(many(this.target))(io).or(Right(io))
