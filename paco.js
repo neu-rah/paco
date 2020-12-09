@@ -3,7 +3,7 @@
  // we depend on:
  //rsite-funjs from https://github.com/neu-rah/funjs
 
-const { log, clog, xlog, debuging }=require("./src/debug")
+const { log, clog, xlog, debugging }=require("./src/debug")
 const { Msg, Expect, Error }=require("./src/error")
 const { SStr }=require("./src/strstr.js")
 

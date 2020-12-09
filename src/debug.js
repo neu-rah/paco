@@ -1,10 +1,10 @@
 "use strict";
 
-const debuging=false
+const debugging=process.env.NODE_DEV
 
-if (debuging) console.log("DEBUG -------------")
+if (debugging) console.log("DEBUG -------------")
 
-exports.clog=function() {return debuging?console.log.apply(null,arguments):undefined}
+exports.clog=function() {return debugging?console.log.apply(null,arguments):undefined}
 exports.log=(o,p)=>typeof p==="undefined"?p=>(console.log(o,p),p):(console.log(o,p),p)
 exports.xlog=(x,p)=>typeof p==="undefined"?p=>(console.log(x(p)),p):(console.log(x(p)),p)
-exports.debuging=debuging
+exports.debugging=debugging

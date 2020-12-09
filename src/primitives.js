@@ -1,6 +1,6 @@
 "use strict";
 
-const {log,clog,xlog,debuging}=require("./debug.js")
+const {log,clog,xlog,debugging}=require("./debug.js")
 const { patchPrimitives,map,foldr } = require("rsite-funjs");
 
 patchPrimitives(
