@@ -33,12 +33,18 @@ patchPrimitives(
 //////////////////////////////////////////////////////////
 // Parser
 
+var config={
+  optimize:true,//all optimizations
+  backtrackExclusions: false//exclude next selector root from current loop match
+}
+
 const {
   isAnyChar, isChar, anyCase, isOneOf, isNoneOf, inRange,
   isDigit, isLower, isUpper, isLetter, isAlphaNum, isHexDigit, isOctDigit,
   isSpace, isTab, is_nl, is_cr, isBlank, isEof, isEol,
   Point, Set, Range,
 }=require("./src/primitives")
+
 
 const quickParam=p=>typeof p === "string" ? (p.length === 1 ? char(p) : string(p)) : p
 
@@ -102,7 +108,19 @@ class Parser extends Function {
     consumes() {return this.target.consumes()||this.next.consumes()}
   }
   static Exclusive=class Exclusive extends Parser.Chain {
-    optim() {return this}
+    constructor(o,p,op) {
+      super(o,p)
+      this.op=op
+    }
+    exclude(ex) {return this}
+    optim() {
+      if(config.optimize&&this.op) return this
+      this.target=this.target.exclude(this).optim()
+      this.op=true
+      this.next=this.next.optim()
+      return this
+    }
+    // optim() {return this}
   }
 
   static Post=class Post extends Parser.Link {
@@ -132,19 +150,7 @@ class Parser extends Function {
   verify(f,m) {return new Parser.Verify(this,f,m)}
 
   static Then=class Then extends Parser.Exclusive {
-    constructor(o,p,op) {
-      super(o,p)
-      this.op=op
-    }
     get expect() {return this.target.expect+" then "+this.next.expect}
-    exclude(ex) {return this}
-    optim() {
-      if(!debugging||this.op) return this
-      this.target=this.target.exclude(this).optim()
-      this.op=true
-      this.next=this.next.optim()
-      return this
-    }
     run(io) {return io.mbind(this.target).mbind(this.next)}
   }
   then(p,op) {return new Parser.Then(this,quickParam(p),op).optim()}
@@ -156,7 +162,7 @@ class Parser extends Function {
       return os.mbind(this.next).map(map(o=>snd(fromRight(os))))
     }
   }
-  skip(p) {return new Parser.Skip(this,quickParam(p))}
+  skip(p,op) {return new Parser.Skip(this,quickParam(p),op).optim()}
 
   static LookAhead=class LookAhead extends Parser.Exclusive {
     get expect() {return this.target.expect+" but look ahead for "+this.next.expect}
@@ -169,7 +175,7 @@ class Parser extends Function {
       return r
     }
   }
-  lookAhead(p) {return new Parser.LookAhead(this,quickParam(p))}
+  lookAhead(p,op) {return new Parser.LookAhead(this,quickParam(p,op)).optim()}
 
   static Excluding=class Excluding extends Parser.Exclusive {
     get expect() {return this.target.expect+" excluding "+this.next.expect}
@@ -182,7 +188,7 @@ class Parser extends Function {
       return this.target(io)
     }
   }
-  excluding(p) {return new Parser.Excluding(this,quickParam(p))}
+  excluding(p,op) {return new Parser.Excluding(this,quickParam(p,op)).optim()}
 
   static NotFollowedBy=class NotFollowedBy extends Parser.Chain {
     get expect() {return this.target.expect+" excluding "+this.next.expect}
@@ -431,7 +437,7 @@ class Many extends Parser.Link {
   safe() {return this.target.consumes()&&!(this.target.canFail()&&this.target.safe())}
   static highOrder() {return true}
   exclude(ex) {
-    if(!ex.next.root().highOrder())
+    if(config.backtrackExclusions&&!ex.next.root().highOrder())
       switch(ex.constructor.name) {
         case "Excluding": return many(this.target.excluding(ex.next.root()))
         case "LookAhead": return many(this.target.lookAhead(ex.next.root()))
@@ -574,6 +580,7 @@ exports.parse=parse
 exports.Pair=Pair
 exports.SStr=SStr
 exports.Meta=Meta
+exports.config=config
 
 // exports.maps=maps
 

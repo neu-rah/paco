@@ -54,19 +54,37 @@ Right { value: [ 'temp: ', { temp: 12, unit: 'K' } ] }
 
 this, along `.verify`, `.post` and `.as` allow event callbacks and all sort of automation during the parsing, if not then let me know.
 
-**It's now possible to parse this _(on debug mode)_:**
+**It's now possible to parse this:** _enable/disable by config_
+
+Enable with `config.backtrackExclusions=true`
+
 ```javascript
 #>digits.join().as(parseInt).then(digit).parse("1234")
 Right { value: Pair { a: '', b: [ 123, '4' ] } }
 ```
-> `then` optimization chain is still unstable, so i've disabled it as it is not optional (yet)
-
 `.then`, `.skip` and others can inject exclusion checks on the chain at construction time.
 We allow the parser base to be re-writen at construction time, keeping away all checking from parse time.
 
-`many` will peeks this injected parameters and possibly exclude them from the sequence match
+`many` will peek this injected parameters and possibly exclude them from the sequence match
 
 >optimization chain is not very populated yet, there are many things to fit in...
+
+## Config
+
+**module exported variable **
+
+```javascript
+var config={
+  optimize:true,//all optimizations
+  backtrackExclusions: false//exclude next selector root from current loop match
+}
+```
+- **optimize** disable all optimizations when false
+
+- **backtrackExclusions** exclude next parser root from the current selection  
+
+> backtrack can be dismissed for well writen parsers  
+(there is still a ling way to go here)
 
 ---
 ## .then | .skip
