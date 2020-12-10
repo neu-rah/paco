@@ -39,8 +39,6 @@ const {
   Point, Set, Range,
 }=require("./src/primitives")
 
-var thenPrefix=undefined
-
 const quickParam=p=>typeof p === "string" ? (p.length === 1 ? char(p) : string(p)) : p
 
 const highOrder=o=>o.highOrder()
@@ -149,20 +147,7 @@ class Parser extends Function {
       this.target=this.target.exclude(this).optim()
       this.op=true
       this.next=this.next.optim()
-      // if(thenPrefix) {
-      //   clog(this.uniqueId,"add prefix to",this.expect)
-      //   var e=this.setEx(this)
-      //   // return this.target.optimize().then(thenPrefix,true).then(this.next.optimize(),true)
-      //   return new this.constructor(
-      //     new this.constructor(e.target.optimize(),thenPrefix,true),
-      //     e.next.optimize(),true)
-      // }
-      // this.target=this.target.optimize()
-      // this.next=this.next.optimize()
-      // return this.target.setEx(this)
-      // return this
-
-      return thenPrefix?this.target.then(thenPrefix,true).then(this.next,true):this
+      return this
     }
     run(io) {return io.mbind(this.target).mbind(this.next)}
   }
@@ -449,10 +434,6 @@ class Many extends Parser.Link {
   safe() {return this.target.consumes()&&!(this.target.canFail()&&this.target.safe())}
   static highOrder() {return true}
   exclude(ex) {
-    if(ex.op) throw new Error("already optimized!")
-    if(debugging) this.old=this
-    // clog(this.expect,"exclude",ex.expect)
-    // if(ex.next.highOrder()) throw new Error("expecting character level parser here")
     if(!ex.next.root().highOrder())
       switch(ex.constructor.name) {
         case "Excluding": return many(this.target.excluding(ex.next.root()))
@@ -583,7 +564,6 @@ exports.parse=parse
 exports.Pair=Pair
 exports.SStr=SStr
 exports.Meta=Meta
-exports.thenPrefix=thenPrefix
 
 // exports.maps=maps
 
@@ -603,9 +583,3 @@ const time=(p,n,q)=>io=>chrono(()=>p.parse(io),n||1,q)
 exports.chrono=chrono
 exports.time=time
 
-// thenPrefix=skip(blanks)
-clog("-----------------------")
-// var a=many(alphaNum).join().then(digit).then(letters.join())
-// clog(a.parse("1234aa"))
-
-parse(">")(optional(digits).then(letter).join())("123a")
