@@ -54,19 +54,11 @@ this, along `.verify`, `.post` and `.as` allow event callbacks and all sort of a
 Right { value: Pair { a: '', b: [ 123, '4' ] } }
 ```
 `.then`, `.skip` and others can inject exclusion checks on the chain at construction time.
-We allow the parser base to be re-writen at construction time, keeping away all checking at parse time.
+We allow the parser base to be re-writen at construction time, keeping away all checking from parse time.
 
 `many` will peeks this injected parameters and possibly exclude them from the sequence match
 
-this is only done for character level parsers where the selector is used to rewrite the `many` selector in a way that respects the injecting parser. Please note that `string` is a character level parser and it can _play_ with single character parsers.
-
-Using this schema we avoid the need of manally excluding, specially if we are reading a bottom-up grammar.
-
-on the example `digits` is a composed parser, using `many`, nonetheless the parameters traversed the `.join` and `.as` modifiers and were excluded from the `many` match loop.
-
-> `p.exlude(q) || p.lookAhead(q)` is used as `many` pattern in place of `p` when `q` follows `p` and `q` is a character parser
-
-_this parser is inspired but not following "parsec"_
+>optimization chain is not very populated yet, there are many things to fit in...
 
 ---
 ## .then | .skip
@@ -429,3 +421,5 @@ Parser
 ```
 
 _(*) this classes are embedded into the main Parser class as static members_
+
+_this parser is inspired but not following "parsec"_
