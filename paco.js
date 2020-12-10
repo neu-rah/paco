@@ -52,7 +52,7 @@ class Parser extends Function {
     super('...args', 'return this.__self__.run(...args)')
     var self=this.bind(this)
     this.__self__=self
-    if(debugging) self.uniqueId=uniqueId++
+    if(debugging) self.uid=uniqueId++
     return self
   }
   // _run(...args){return this.run(...args)}
@@ -61,7 +61,8 @@ class Parser extends Function {
   consumes() {return true}
   safe() {return this.consumes()||this.canFail()}
   root() {return this}
-  setEx(ex) {return this}
+  optim() {return this}
+  exclude(ex) {return this}
   parse(s) {return this(Pair(s, []))}
   post(f) {}
 
@@ -71,6 +72,13 @@ class Parser extends Function {
       super()
       this.target=o
     }
+    exclude(ex) {
+      this.target=this.target.exclude(ex)
+      return this
+    }
+    map(f) {new Link(f(this.target))}
+    pure(o) {return new Link(o)}
+    app(o) {return this.pure(this.target(o.target))}
     highOrder() {return this.target.highOrder()}
     canFail() {return this.target.canFail()}
     consumes() {return this.target.consumes()}
@@ -82,6 +90,14 @@ class Parser extends Function {
       super(o)
       this.next=p
     }
+    exclude(ex) {
+      super.exclude(ex)
+      this.next=this.next.exclude(ex)
+      return this
+    }
+    map(f) {return new Chain(f(this.target))}
+    pure(o,p) {return new Chain(o,p)}//?
+    app(o) {return this.pure(this.target(o.target,this).next(o.next))}
     highOrder() {return this.target.highOrder()||this.next.highOrder()}
     canFail() {return this.target.canFail()||this.next.canFail()}
     consumes() {return this.target.consumes()||this.next.consumes()}
@@ -89,8 +105,9 @@ class Parser extends Function {
   static Exclusive=class Exclusive extends Parser.Chain {
     constructor(o,p) {
       super(o,p)
+      // this.target=o.optim()
     }
-    setEx(ex) {return this}
+    optim() {return this}
   }
 
   static Post=class Post extends Parser.Link {
@@ -122,14 +139,34 @@ class Parser extends Function {
   static Then=class Then extends Parser.Exclusive {
     constructor(o,p,op) {
       super(o,p)
+      this.op=op
     }
-    get expect() {return this.target.expect+"\nthen "+this.next.expect}
     get expect() {return this.target.expect+" then "+this.next.expect}
-    safe() {return this.target.canFail()||this.next.consumes()}
-    setEx(ex) {return thenPrefix?this.target.then(thenPrefix).then(this.next):this}
+    exclude(ex) {return this}
+    optim() {
+      if(this.op) return this
+      clog("then optimize:",this.expect)
+      this.target=this.target.exclude(this).optim()
+      this.op=true
+      this.next=this.next.optim()
+      // if(thenPrefix) {
+      //   clog(this.uniqueId,"add prefix to",this.expect)
+      //   var e=this.setEx(this)
+      //   // return this.target.optimize().then(thenPrefix,true).then(this.next.optimize(),true)
+      //   return new this.constructor(
+      //     new this.constructor(e.target.optimize(),thenPrefix,true),
+      //     e.next.optimize(),true)
+      // }
+      // this.target=this.target.optimize()
+      // this.next=this.next.optimize()
+      // return this.target.setEx(this)
+      // return this
+
+      return thenPrefix?this.target.then(thenPrefix,true).then(this.next,true):this
+    }
     run(io) {return io.mbind(this.target).mbind(this.next)}
   }
-  then(p) {return new Parser.Then(this,quickParam(p))}
+  then(p,op) {return new Parser.Then(this,quickParam(p),op).optim()}
 
   static Skip=class Skip extends Parser.Exclusive {
     get expect() {return this.target.expect+"\nskip "+this.next.expect}
@@ -169,7 +206,7 @@ class Parser extends Function {
   static NotFollowedBy=class NotFollowedBy extends Parser.Chain {
     get expect() {return this.target.expect+" excluding "+this.next.expect}
     root() {return this.target.root().notFollowedBy(this.next.root())}
-    setEx(ex) {return new Parser.NotFollowedBy(this.target.setEx(ex),this.msg)}
+    optim() {return new Parser.NotFollowedBy(this.target.optim(),this.msg)}
     canFail() {return this.target.canFail()||!this.next.canFail()}
     consumes() {return this.target.consumes()}
     run(io) {
@@ -183,7 +220,7 @@ class Parser extends Function {
   static Or=class Or extends Parser.Chain {
     get expect() {return this.target.expect+" or "+this.next.expect}
     root() {return this.target.root().or(this.next.root())}
-    setEx(ex) {return new Parser.Or(this.target.setEx(ex),this.next.setEx(ex))}
+    optim() {return new Parser.Or(this.target.optim(),this.next.optim())}
     consumes() {return this.target.consumes()||this.next.consumes()}
     run(io) {
       const r=this.target(io)
@@ -199,7 +236,7 @@ class Parser extends Function {
       this.msg=msg
     }
     get expect() {return this.msg}
-    setEx(ex) {return new Parser.FailMsg(this.target.setEx(ex),this.msg)}
+    optim() {return new Parser.FailMsg(this.target.optim(),this.msg)}
     run(io) {
       return this.target(io).or(Left(Pair(io.fst(), new Error(this.msg))))
     }
@@ -211,7 +248,7 @@ class Parser extends Function {
       super(o)
       this.func=f
     }
-    setEx(ex) {return new Parser.As(this.target.setEx(ex),this.func)}
+    optim() {return new Parser.As(this.target.optim(),this.func)}
     get expect() {
       const xfname=f=>{//aux
         const ff=f.name || f.toString()
@@ -233,7 +270,7 @@ class Parser extends Function {
       super(o)
       this.func=p
     }
-    setEx(ex) {return new Parser.Join(this.target.setEx(ex),this.func)}
+    optim() {return new Parser.Join(this.target.optim(),this.func)}
     get expect() {return typeof this.func === "undefined" ? "("+this.target.expect+")->join()" : "("+this.target.expect+")->join(\""+this.func+"\")"}
     run(io) {
       return typeof this.func === "undefined" ? 
@@ -248,7 +285,7 @@ class Parser extends Function {
       super(o)
       this.tag=tag
     }
-    setEx(ex) {return new Parser.To(this.target.setEx(ex),this.tag)}
+    optim() {return new Parser.To(this.target.optim(),this.tag)}
     get expect() {return "("+this.target.expect+")->tagged as(\""+this.tag+"\")"}
     run(io) {
       const mktag=lr=>{
@@ -280,7 +317,8 @@ class Meta extends Parser.Link {
     this.willConsume=typeof consumes==="undefined"?true:consumes
   }
   run(io){return this.target(io)}
-  setEx(ex) {return this}
+  optim() {return this}
+  exclude(ex) {return this}
   canFail() {return !this.noFail}
   highOrder() {return this.noFail}
   consumes() {return this.willConsume}
@@ -350,7 +388,7 @@ class Str extends Parser {
 const string=str=>new Str(str)
 // case-insensitive string match
 const caseInsensitive=str=>new Meta(
-  io=>(foldr1(a=>b=>b.then(a))(str.split("").map(o=>cases(o))).join())(io)
+  io=>(foldr1(a=>b=>b.then(a,true))(str.split("").map(o=>cases(o))).join())(io)
 ).failMsg("non case-sensitive form of string `"+str+"`")
 
 class Regex extends Parser {
@@ -410,33 +448,36 @@ class Many extends Parser.Link {
   static consumes() {return false}
   safe() {return this.target.consumes()&&!(this.target.canFail()&&this.target.safe())}
   static highOrder() {return true}
-  setEx(ex) {
+  exclude(ex) {
+    if(ex.op) throw new Error("already optimized!")
+    if(debugging) this.old=this
+    // clog(this.expect,"exclude",ex.expect)
     // if(ex.next.highOrder()) throw new Error("expecting character level parser here")
     if(!ex.next.root().highOrder())
       switch(ex.constructor.name) {
         case "Excluding": return many(this.target.excluding(ex.next.root()))
         case "LookAhead": return many(this.target.lookAhead(ex.next.root()))
         default:
-          return many(this.target.excluding(ex.next.root()).or(this.target.lookAhead(ex.next.root())))
+          return mxlog("many exluded to:",o=>o.expect)(many(this.target.excluding(ex.next.root()).or(this.target.lookAhead(ex.next.root()))))
       }
   }
   run(io) {
-    return this.target.then(many(this.target))(io).or(Right(io))
+    return this.target.then(many(this.target),true)(io).or(Right(io))
   }
 }
 const many=p=>new Many(p)
 
-const many1=p=>(p.then(many(p))).failMsg("at least one "+p.expect)
+const many1=p=>(p.then(many(p),true)).failMsg("at least one "+p.expect)
 
 const manyTill=curry((p,e)=>new Meta(
-  io=>p.excluding(e).then(manyTill(p,e))(io).or(Right(io)),true
+  io=>p.excluding(e).then(manyTill(p,e),true)(io).or(Right(io))
 ).failMsg("many "+p.expect+" until "+e.expect))//never fails
 
 const count=curry((n,p)=>new Meta(
-  io=>n ? p.then(count(n-1,p))(io) : Right(io),!p.canFail()
+  io=>n ? p.then(count(n-1,p),true)(io) : Right(io),!p.canFail()
 ).failMsg(n+" of "+p.expect))
 
-const between=curry((open,close,p)=>skip(open).then(p).skip(close))
+const between=curry((open,close,p)=>skip(open).then(p,true).skip(close))
 
 const option=curry((x, p)=>new Meta(
   io=>p(io).or(Right(Pair(io.fst(), [x]))),true
@@ -447,16 +488,16 @@ const optionMaybe=p=>new Meta(
 ).failMsg("maybe "+p.expect)//never fails
 
 const sepBy=curry((p, sep)=> new Meta(
-  io=>p.then(many(skip(sep).then(p)))(io).or(Right(io)),true
+  io=>p.then(many(skip(sep).then(p,true)),true)(io).or(Right(io)),true
 ).failMsg(p.expect+" separated by "+sep.expect))//never fails
 
-const sepBy1=curry((p,sep)=>p.then(many(skip(sep).then(p))).failMsg(p.expect+" separated by "+sep.expect))
+const sepBy1=curry((p,sep)=>p.then(many(skip(sep).then(p,true)),true).failMsg(p.expect+" separated by "+sep.expect))
 
 const endBy=curry((p,sep)=>new Meta(//TODO: review this, can not use sepBy
-  io=>sepBy(p)(sep).then(skip(sep))(io).or(Right(io)),!(sep.canFail()||p.canFail())
+  io=>sepBy(p)(sep).then(skip(sep),true)(io).or(Right(io)),!(sep.canFail()||p.canFail())
 ).failMsg(p.expect+" separated and ending with "+sep.expect))
 
-const endBy1=curry((p,sep)=>sepBy1(p)(sep).then(skip(sep)).failMsg("at least one of "+p.expect+" separated and ending with "+sep.expect))
+const endBy1=curry((p,sep)=>sepBy1(p)(sep).then(skip(sep),true).failMsg("at least one of "+p.expect+" separated and ending with "+sep.expect))
 
 // high order character parser
 const spaces=many(space).failMsg("spaces")
@@ -563,3 +604,8 @@ exports.chrono=chrono
 exports.time=time
 
 // thenPrefix=skip(blanks)
+clog("-----------------------")
+// var a=many(alphaNum).join().then(digit).then(letters.join())
+// clog(a.parse("1234aa"))
+
+parse(">")(optional(digits).then(letter).join())("123a")
