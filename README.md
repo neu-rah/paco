@@ -24,6 +24,12 @@ Some available metaparsers like `many()`, `many1()`, `skip()` can accept other p
 
 Some parsers are already a composition with metaparsers, that is the case of `digits`, it will perform `many(digit)`.
 
+**abbreviations**
+
+a single string can now be used in place of a non-chaining parser and it will translater either to a `char` or `string` parser.
+
+> `digits.then('.')` is valid as `digits.then(char('.'))`
+
 ## Building objects
 
 `.to(tag)` extender will grab the current parsing group result and store it on object key `tag`
@@ -48,11 +54,13 @@ Right { value: [ 'temp: ', { temp: 12, unit: 'K' } ] }
 
 this, along `.verify`, `.post` and `.as` allow event callbacks and all sort of automation during the parsing, if not then let me know.
 
-**It's now possible to parse this:**
+**It's now possible to parse this _(on debug mode)_:**
 ```javascript
 #>digits.join().as(parseInt).then(digit).parse("1234")
 Right { value: Pair { a: '', b: [ 123, '4' ] } }
 ```
+> `then` optimization chain is still unstable, so i've disabled it as it is not optional (yet)
+
 `.then`, `.skip` and others can inject exclusion checks on the chain at construction time.
 We allow the parser base to be re-writen at construction time, keeping away all checking from parse time.
 

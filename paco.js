@@ -142,7 +142,7 @@ class Parser extends Function {
     get expect() {return this.target.expect+" then "+this.next.expect}
     exclude(ex) {return this}
     optim() {
-      if(this.op) return this
+      if(debugging||this.op) return this
       clog("then optimize:",this.expect)
       this.target=this.target.exclude(this).optim()
       this.op=true
