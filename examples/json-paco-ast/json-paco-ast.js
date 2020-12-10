@@ -15,7 +15,7 @@ const paco=require("../../paco");
 
 //2. JSON Grammar
 
-const ws = paco.many(paco.skip(paco.oneOf("\u{20}\u{09}\u{0A}\u{0D}")))
+const ws = paco.skip(paco.many(paco.oneOf(" \t\n\r")))
 // const ws = paco.many(paco.skip(paco.oneOf(" \t\n\r")))
 const begin_array     = ws.then(paco.char("\u{5B}")).then(ws)// [ left square bracket
 const begin_object    = ws.then(paco.char("\u{7B}")).then(ws)// { left curly bracket
@@ -102,7 +102,7 @@ function object() {
 }
 
 //2. Grammar
-const JSON_text = paco.skip(ws).then(value).skip(ws)
+const JSON_text = new paco.Meta(io=>ws.then(value).then(ws)(io)).failMsg("JSON parse fail")
 
 const json=s=>{
   const r=paco.res("JSON>")(JSON_text.parse(s))
@@ -122,7 +122,8 @@ if(process.argv[2]){
 {
   console.log("paco JSON parse")
   const start=new Date()
-  console.log(parseFile("/home/azevedo/code/nodes/paco/examples/json-paco-ast/ex6.json"))
+  console.log(parseFile("/home/azevedo/code/nodes/paco/examples/json-paco-ast/ex4.json"))
   const end=new Date()
   console.log((end-start)/1000,"s")
 }
+

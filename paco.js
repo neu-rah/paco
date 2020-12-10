@@ -3,6 +3,7 @@
  // we depend on:
  //rsite-funjs from https://github.com/neu-rah/funjs
 
+// const assert = require('assert');
 const { log, clog, xlog,mxlog, debugging }=require("./src/debug")
 const { Msg, Expect, Error }=require("./src/error")
 const { SStr }=require("./src/strstr.js")
@@ -101,10 +102,6 @@ class Parser extends Function {
     consumes() {return this.target.consumes()||this.next.consumes()}
   }
   static Exclusive=class Exclusive extends Parser.Chain {
-    constructor(o,p) {
-      super(o,p)
-      // this.target=o.optim()
-    }
     optim() {return this}
   }
 
@@ -143,7 +140,6 @@ class Parser extends Function {
     exclude(ex) {return this}
     optim() {
       if(!debugging||this.op) return this
-      clog("then optimize:",this.expect)
       this.target=this.target.exclude(this).optim()
       this.op=true
       this.next=this.next.optim()
@@ -191,7 +187,7 @@ class Parser extends Function {
   static NotFollowedBy=class NotFollowedBy extends Parser.Chain {
     get expect() {return this.target.expect+" excluding "+this.next.expect}
     root() {return this.target.root().notFollowedBy(this.next.root())}
-    optim() {return new Parser.NotFollowedBy(this.target.optim(),this.msg)}
+    optim() {return new Parser.NotFollowedBy(this.target.optim(),this.next.optim())}
     canFail() {return this.target.canFail()||!this.next.canFail()}
     consumes() {return this.target.consumes()}
     run(io) {
@@ -301,6 +297,7 @@ class Meta extends Parser.Link {
     this.noFail=typeof noFail==="undefined"?true:noFail
     this.willConsume=typeof consumes==="undefined"?true:consumes
   }
+  get expect() {return "Meta!"}
   run(io){return this.target(io)}
   optim() {return this}
   exclude(ex) {return this}
@@ -426,7 +423,7 @@ const choice=ps=>foldl1(a=>b=>a.or(b))(ps)
 class Many extends Parser.Link {
   constructor(o){
     super(o)
-    if(debugging&&o.consumes()&&!(o.safe()&&o.canFail())) clog("warning: many should not be requested with a parser that can not fail or might not consume")
+    // if(debugging&&o.consumes()&&!(o.safe()&&o.canFail())) clog("warning: many should not be requested with a parser that can not fail or might not consume")
   }
   get expect() {return "many("+this.target.expect+")"}//never fails
   static canFail() {return false}
@@ -439,46 +436,59 @@ class Many extends Parser.Link {
         case "Excluding": return many(this.target.excluding(ex.next.root()))
         case "LookAhead": return many(this.target.lookAhead(ex.next.root()))
         default:
-          return mxlog("many exluded to:",o=>o.expect)(many(this.target.excluding(ex.next.root()).or(this.target.lookAhead(ex.next.root()))))
+          return many(this.target.excluding(ex.next.root()).or(this.target.lookAhead(ex.next.root())))
       }
+    return this
   }
   run(io) {
     return this.target.then(many(this.target),true)(io).or(Right(io))
   }
 }
-const many=p=>new Many(p)
+const many=p=>new Many(quickParam(p))
 
-const many1=p=>(p.then(many(p),true)).failMsg("at least one "+p.expect)
+const many1=p=>(quickParam(p).then(many(p),true)).failMsg("at least one "+p.expect)
 
 const manyTill=curry((p,e)=>new Meta(
-  io=>p.excluding(e).then(manyTill(p,e),true)(io).or(Right(io))
+  io=>{
+    p=quickParam(p)
+    e=quickParam(e)
+    return p.excluding(e).then(manyTill(p,e),true)(io).or(Right(io))
+  }
 ).failMsg("many "+p.expect+" until "+e.expect))//never fails
 
-const count=curry((n,p)=>new Meta(
+const count=curry((n,p)=>(p=>new Meta(
   io=>n ? p.then(count(n-1,p),true)(io) : Right(io),!p.canFail()
-).failMsg(n+" of "+p.expect))
+).failMsg(n+" of "+p.expect))(quickParam(p)))
 
-const between=curry((open,close,p)=>skip(open).then(p,true).skip(close))
+const between=curry((open,close,p)=>
+  skip(quickParam(open))
+  .then(quickParam(p),true)
+  .skip(quickParam(close)))
 
-const option=curry((x, p)=>new Meta(
+const option=curry((x, p)=>(p=>new Meta(
   io=>p(io).or(Right(Pair(io.fst(), [x]))),true
-).failMsg("option "+p.expect+" else "+x))//never fails
+).failMsg("option "+p.expect+" else "+x))(quickParam(p)))//never fails
 
-const optionMaybe=p=>new Meta(
+const optionMaybe=p=>(p=>new Meta(
   io=>p.as(Just)(io).or(Right(Pair(io.fst(), Nothing()))),true
-).failMsg("maybe "+p.expect)//never fails
+).failMsg("maybe "+p.expect))(quickParam(p))//never fails
 
-const sepBy=curry((p, sep)=> new Meta(
+const sepBy=curry((p, sep)=>(p=>sep=>new Meta(
   io=>p.then(many(skip(sep).then(p,true)),true)(io).or(Right(io)),true
-).failMsg(p.expect+" separated by "+sep.expect))//never fails
+).failMsg(p.expect+" separated by "+sep.expect))(quickParam(p))(quickParam(sep)))//never fails
 
-const sepBy1=curry((p,sep)=>p.then(many(skip(sep).then(p,true)),true).failMsg(p.expect+" separated by "+sep.expect))
+const sepBy1=curry((p,sep)=>(p=>sep=>
+  p.then(many(skip(sep).then(p,true)),true)
+  .failMsg(p.expect+" separated by "+sep.expect))(quickParam(p))(quickParam(sep)))
 
-const endBy=curry((p,sep)=>new Meta(//TODO: review this, can not use sepBy
+const endBy=curry((p,sep)=>(p=>sep=>new Meta(//TODO: review this, can not use sepBy
   io=>sepBy(p)(sep).then(skip(sep),true)(io).or(Right(io)),!(sep.canFail()||p.canFail())
-).failMsg(p.expect+" separated and ending with "+sep.expect))
+).failMsg(p.expect+" separated and ending with "+sep.expect))(quickParam(p))(quickParam(sep)))
 
-const endBy1=curry((p,sep)=>sepBy1(p)(sep).then(skip(sep),true).failMsg("at least one of "+p.expect+" separated and ending with "+sep.expect))
+const endBy1=curry((p,sep)=>(p=>sep=>
+  sepBy1(p)(sep).then(skip(sep),true)
+  .failMsg("at least one of "+p.expect+" separated and ending with "+sep.expect))
+  (quickParam(p))(quickParam(sep)))
 
 // high order character parser
 const spaces=many(space).failMsg("spaces")
@@ -568,7 +578,6 @@ exports.Meta=Meta
 // exports.maps=maps
 
 const chrono=(p,cnt,quiet)=>{
-  clog(".")
   const start=new Date()
   for(var n=cnt;n;n--) p()
   const end=new Date()

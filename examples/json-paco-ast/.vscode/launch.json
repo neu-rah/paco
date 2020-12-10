@@ -11,6 +11,7 @@
       "skipFiles": [
         "<node_internals>/**"
       ],
+      "envFile": "${workspaceFolder}/.env",
       "program": "${workspaceFolder}/json-paco-ast"
     }
   ]

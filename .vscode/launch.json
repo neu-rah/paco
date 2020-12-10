@@ -12,7 +12,7 @@
         "<node_internals>/**"
       ],
       "program": "${workspaceFolder}/paco.js",
-      "envFile": "${workspaceFolder}/.env",
+      "envFile": "${workspaceFolder}/.env"
     }
   ]
 }
