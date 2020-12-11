@@ -21,9 +21,10 @@
     "url": "https://github.com/neu-rah/paco.git"
   },
   "keywords": [
-    "Monadic",
+    "monadic",
     "parser",
     "combinators",
-    "functional"
+    "functional",
+    "parserlib"
   ]
 }

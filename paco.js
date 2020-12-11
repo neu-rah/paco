@@ -35,7 +35,7 @@ patchPrimitives(
 
 var config={
   optimize:true,//all optimizations
-  backtrackExclusions: false//exclude next selector root from current loop match
+  backtrackExclusions: debugging//exclude next selector root from current loop match
 }
 
 const {
@@ -112,9 +112,12 @@ class Parser extends Function {
       super(o,p)
       this.op=op
     }
-    exclude(ex) {return this}
+    exclude(ex) {
+      this.target=this.target.exlude(ex)
+      return this
+    }
     optim() {
-      if(config.optimize&&this.op) return this
+      if(this.op||!config.optimize) return this
       this.target=this.target.exclude(this).optim()
       this.op=true
       this.next=this.next.optim()
@@ -166,7 +169,7 @@ class Parser extends Function {
 
   static LookAhead=class LookAhead extends Parser.Exclusive {
     get expect() {return this.target.expect+" but look ahead for "+this.next.expect}
-    root() {return this.target.root().lookAhead(this.next.root())}
+    root() {return this.target.root().lookAhead(this.next.root(),true)}
     consumes() {return this.target.consumes()}
     run(io) {
       const r=this.target(io)
@@ -179,7 +182,7 @@ class Parser extends Function {
 
   static Excluding=class Excluding extends Parser.Exclusive {
     get expect() {return this.target.expect+" excluding "+this.next.expect}
-    root() {return this.target.root().excluding(this.next.root())}
+    root() {return this.target.root().excluding(this.next.root(),true)}
     canFail() {return this.target.canFail()||!this.next.canFail()}
     consumes() {return this.target.consumes()}
     run(io) {
@@ -192,7 +195,7 @@ class Parser extends Function {
 
   static NotFollowedBy=class NotFollowedBy extends Parser.Chain {
     get expect() {return this.target.expect+" excluding "+this.next.expect}
-    root() {return this.target.root().notFollowedBy(this.next.root())}
+    root() {return this.target.root().notFollowedBy(this.next.root(),true)}
     optim() {return new Parser.NotFollowedBy(this.target.optim(),this.next.optim())}
     canFail() {return this.target.canFail()||!this.next.canFail()}
     consumes() {return this.target.consumes()}
@@ -447,7 +450,11 @@ class Many extends Parser.Link {
     return this
   }
   run(io) {
-    return this.target.then(many(this.target),true)(io).or(Right(io))
+    // clog("many parsing:",io)
+    var r=this.target.then(many(this.target),true)(io).or(Right(io))
+    // clog("many parsed to:",r.value)
+    // if(isLeft(r)) return r
+    return r//fromRight(r).mbind(o=>o.mbind(many(this.target)))
   }
 }
 const many=p=>new Many(quickParam(p))
@@ -599,3 +606,12 @@ const time=(p,n,q)=>io=>chrono(()=>p.parse(io),n||1,q)
 exports.chrono=chrono
 exports.time=time
 
+// clog(many(digits.join().then(eol)).parse("123\n332"))
+// clog(digits.join().then(digit).parse("123"))
+const a=(digits.join().then(eol))
+clog(a.optim().expect)
+clog(a.expect)
+clog(a.root().expect)
+// clog(a.root().expect)
+// clog(a.root().expect)
+// clog(a.expect)
