@@ -35,15 +35,15 @@ patchPrimitives(
 
 var config={
   optimize:true,//all optimizations
-  backtrackExclusions: debugging//exclude next selector root from current loop match
+  backtrackExclusions: false//debugging//exclude next selector root from current loop match
 }
 
 const {
   isAnyChar, isChar, anyCase, isOneOf, isNoneOf, inRange,
   isDigit, isLower, isUpper, isLetter, isAlphaNum, isHexDigit, isOctDigit,
-  isSpace, isTab, is_nl, is_cr, isBlank, isEof, isEol,
+  isSpace, isTab, is_nl, is_cr, isBlank, isEof, isEol,expect,neg,
   Point, Set, Range,
-}=require("./src/primitives")
+}=require("./src/charp")
 
 
 const quickParam=p=>typeof p === "string" ? (p.length === 1 ? char(p) : string(p)) : p
@@ -112,11 +112,10 @@ class Parser extends Function {
       super(o,p)
       this.op=op
     }
-    exclude(ex) {
-      this.target=this.target.exlude(ex)
-      return this
-    }
+    exclude(ex) {return this}
     optim() {
+      // process.stdout.write(".")
+      // clog("op:",this.expect)
       if(this.op||!config.optimize) return this
       this.target=this.target.exclude(this).optim()
       this.op=true
@@ -334,7 +333,7 @@ const none=new None()
 
 class Skip extends Parser.Link {
   get expect() {return "skip "+this.target.expect}
-  run(io) {return none.skip(this.target)(io)}
+  run(io) {return none.skip(this.target,true)(io)}
 }
 //apply skip (continuation) to the root element, using `none` combinator
 const skip=o=>new Skip(quickParam(o))
@@ -348,7 +347,7 @@ class Satisfy extends Parser {
   canFail() {return this.ch.canFail}
   consumes() {return this.ch.consumes}
   run(io) {
-    return this.ch(head(io.fst())) ?
+    return this.ch.match(head(io.fst())) ?
       Right(//success...
         Pair(//build a pair of remaining input and composed output
           tail(io.fst()),//consume input
@@ -372,7 +371,7 @@ class Str extends Parser {
       io.fst().startsWith(this.str)?
         Right(Pair(io.fst().substr(this.str.length),io.snd().append(this.str))):
         Left(Pair(io.fst(),new Expect(this.expect)))
-      ):(foldr1(a=>b=>b.then(a))(this.str.split("").map(o=>char(o))).join())(io)
+      ):(foldr1(a=>b=>b.then(a,true))(this.str.split("").map(o=>char(o))).join())(io)
   }
 }
 // //match a string
@@ -442,10 +441,13 @@ class Many extends Parser.Link {
   exclude(ex) {
     if(config.backtrackExclusions&&!ex.next.root().highOrder())
       switch(ex.constructor.name) {
-        case "Excluding": return many(this.target.excluding(ex.next.root()))
-        case "LookAhead": return many(this.target.lookAhead(ex.next.root()))
+        case "Excluding": return many(this.target.excluding(ex.next.root(),true))
+        case "LookAhead": return many(this.target.lookAhead(ex.next.root(),true))
         default:
-          return many(this.target.excluding(ex.next.root()).or(this.target.lookAhead(ex.next.root())))
+          return many(
+            this.target.excluding(ex.next.root(),true)
+            .or(this.target.lookAhead(ex.next.root(),true))
+          )
       }
     return this
   }
@@ -465,7 +467,7 @@ const manyTill=curry((p,e)=>new Meta(
   io=>{
     p=quickParam(p)
     e=quickParam(e)
-    return p.excluding(e).then(manyTill(p,e),true)(io).or(Right(io))
+    return p.excluding(e,true).then(manyTill(p,e),true)(io).or(Right(io))
   }
 ).failMsg("many "+p.expect+" until "+e.expect))//never fails
 
@@ -476,7 +478,7 @@ const count=curry((n,p)=>(p=>new Meta(
 const between=curry((open,close,p)=>
   skip(quickParam(open))
   .then(quickParam(p),true)
-  .skip(quickParam(close)))
+  .skip(quickParam(close),true))
 
 const option=curry((x, p)=>(p=>new Meta(
   io=>p(io).or(Right(Pair(io.fst(), [x]))),true
@@ -608,10 +610,10 @@ exports.time=time
 
 // clog(many(digits.join().then(eol)).parse("123\n332"))
 // clog(digits.join().then(digit).parse("123"))
-const a=(digits.join().then(eol))
-clog(a.optim().expect)
-clog(a.expect)
-clog(a.root().expect)
+// const a=(digits.join().then(eol))
+// clog(a.optim().expect)
+// clog(a.expect)
 // clog(a.root().expect)
-// clog(a.root().expect)
+// clog(a.root().optim().expect)
+// clog(a.optim().root().expect)
 // clog(a.expect)

@@ -35,7 +35,7 @@ const match=
 
 const digit=chkOf("digit")(range('0','9'))
 const lower=chkOf("lowercase letter")(range('a','z'))
-const upper=chkOf("lowercase letter")(range('A','Z'))
+const upper=chkOf("uppercase letter")(range('A','Z'))
 const letter=chkOf("letter")(o=>lower(o)||upper(o))
 const alphaNum=chkOf("alphanumeric")(o=>letter(o)||digit(o))
 const hex=chkOf("hex digit")(match(digit,range('a','f'),range('A','F')))

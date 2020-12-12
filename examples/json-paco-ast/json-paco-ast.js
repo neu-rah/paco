@@ -102,7 +102,7 @@ function object() {
 }
 
 //2. Grammar
-const JSON_text = new paco.Meta(io=>ws.then(value).then(ws)(io)).failMsg("JSON parse fail")
+const JSON_text = new paco.Meta(io=>ws.then(value).then(ws)(io))//.failMsg("JSON parse fail")
 
 const json=s=>{
   const r=paco.res("JSON>")(JSON_text.parse(s))
@@ -122,7 +122,7 @@ if(process.argv[2]){
 {
   console.log("paco JSON parse")
   const start=new Date()
-  console.log(parseFile("/home/azevedo/code/nodes/paco/examples/json-paco-ast/ex4.json"))
+  console.log(parseFile("/home/azevedo/code/nodes/paco/examples/json-paco-ast/ex6.json"))
   const end=new Date()
   console.log((end-start)/1000,"s")
 }
