@@ -3,25 +3,15 @@
  // we depend on:
  //rsite-funjs from https://github.com/neu-rah/funjs
 
-// const assert = require('assert');
+ var it=exports?global:this
+ if (!exports) var exports={}
+ 
+ // const assert = require('assert');
 const { log, clog, xlog,mxlog, debugging }=require("./src/debug")
 const { Msg, Expect, Error }=require("./src/error")
 const { SStr }=require("./src/strstr.js")
 
-const {
-  patchPrimitives,//patch primitive data types
-  curry,//js curry style
-  id, fcomp, fchain, constant, flip, cons,//Functional
-  peano,succ,//Peano
-  empty, append, mconcat,//Monoid
-  head, tail, init, last, drop, take,//List
-  map,//Functor
-  pure, mbind,//Monad
-  Pair, fst, snd,//Pair (tupple)
-  Maybe, isMaybe, Nothing, isNothing, Just, isJust, fromJust,//Maybe
-  isEither, Left, isLeft, fromLeft, Right, isRight, fromRight,//Either
-  foldable, foldr, foldl, foldr1, foldl1, foldMap,//foldable
-}=require("rsite-funjs");
+Object.assign(it,require("rsite-funjs"))
 
 patchPrimitives(
   Function().__proto__,
@@ -38,13 +28,9 @@ var config={
   backtrackExclusions: false//debugging//exclude next selector root from current loop match
 }
 
-const {
-  isAnyChar, isChar, anyCase, isOneOf, isNoneOf, inRange,
-  isDigit, isLower, isUpper, isLetter, isAlphaNum, isHexDigit, isOctDigit,
-  isSpace, isTab, is_nl, is_cr, isBlank, isEof, isEol,expect,neg,
-  Point, Set, Range,
-}=require("./src/charp")
-
+Object.assign(it,require("./src/charp"))
+// Object.assign(it,require("./src/primitives"))
+Object.assign(it,require("./src/benchm"))
 
 const quickParam=p=>typeof p === "string" ? (p.length === 1 ? char(p) : string(p)) : p
 
@@ -70,6 +56,7 @@ class Parser extends Function {
   exclude(ex) {return this}
   parse(s) {return this(Pair(s, []))}
   post(f) {}
+  simpl() {return Nothing()}
 
   //link something to this parser
   static Link=class Link extends Parser {
@@ -88,7 +75,8 @@ class Parser extends Function {
     canFail() {return this.target.canFail()}
     consumes() {return this.target.consumes()}
     root() {return this.target.root?this.target.root():this}
-}
+    simpl() {return this.target.simpl().mbind(this.constructor)}
+  }
   //chain this parser to another
   static Chain=class Chain extends Parser.Link {
     constructor(o,p) {
@@ -106,6 +94,14 @@ class Parser extends Function {
     highOrder() {return this.target.highOrder()||this.next.highOrder()}
     canFail() {return this.target.canFail()||this.next.canFail()}
     consumes() {return this.target.consumes()||this.next.consumes()}
+    simpl() {
+      var t=this.target.simpl()
+      var n=this.next.simpl()
+      return (t.or(n)).then(Just(new this.constructor(
+        fromJust(t.or(Just(this.target))),
+        fromJust(n.or(Just(this.next)))
+      )))
+    }
   }
   static Exclusive=class Exclusive extends Parser.Chain {
     constructor(o,p,op) {
@@ -216,6 +212,10 @@ class Parser extends Function {
       if (isRight(r)) return r;//break `or` parameter expansion
       return r.or(this.next(io)).or(Left(Pair(io.fst(), new Expect(this.expect))))
     }
+    simplify() {
+      if(this.target.constructor===Satisfy&&this.next.constructor===Satisfy)
+        return Just(satisfy(isMatch(this.target.ch,this.next.ch)))
+    }
   }
   or(p) {return new Parser.Or(this,quickParam(p))}
 
@@ -312,6 +312,7 @@ class Meta extends Parser.Link {
   canFail() {return !this.noFail}
   highOrder() {return this.noFail}
   consumes() {return this.willConsume}
+  simpl() {return Nothing()}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -346,6 +347,7 @@ class Satisfy extends Parser {
   get expect() {return this.ch.expect || "to satisfy condition"}
   canFail() {return this.ch.canFail}
   consumes() {return this.ch.consumes}
+  simpl() {return this.ch.simplify().map(satisfy)}
   run(io) {
     return this.ch.match(head(io.fst())) ?
       Right(//success...
@@ -539,8 +541,6 @@ const res=curry((fn, r)=>{
 
 const parse=curry((fn, p, str)=>res(fn)(p(Pair(str, []))))
 
-if (!exports) var exports={}
-
 exports.satisfy=satisfy
 exports.anyChar=anyChar
 exports.char=char
@@ -608,12 +608,30 @@ const time=(p,n,q)=>io=>chrono(()=>p.parse(io),n||1,q)
 exports.chrono=chrono
 exports.time=time
 
-// clog(many(digits.join().then(eol)).parse("123\n332"))
-// clog(digits.join().then(digit).parse("123"))
-// const a=(digits.join().then(eol))
-// clog(a.optim().expect)
-// clog(a.expect)
-// clog(a.root().expect)
-// clog(a.root().optim().expect)
-// clog(a.optim().root().expect)
-// clog(a.expect)
+// clog(digit.or(letter).or(alphaNum).simpl())
+// alphaNum.simpl()
+
+const runn=cnt=>function run(name,src,mute) {
+  if(!mute) clog("benchmark -----------------")
+  var start=new Date()
+  for(var n=0;n<cnt;n++) src()
+  var end=new Date()
+  if(!mute) console.log(name,(end-start)*1000/cnt,"us")
+}
+
+const run=runn(10000)
+
+run("test",()=>any.parse("x"),true)
+run("test",()=>false,true)
+run("test",()=>true,true)
+
+const tests=[
+  Pair("string................:",()=>string("ok").parse("ok")),
+  Pair("string with failMsg...:",()=>string("ok").failMsg("wtf!").parse("ok")),
+  Pair("string................:",()=>string("ok").parse("ok")),
+  Pair("string with failMsg...:",()=>string("ok").failMsg("wtf!").parse("ok")),
+  Pair("letter.skip(digits.join()).then(letter)",()=>letter.skip(digits.join()).then(letter).parse("a123X..."))
+]
+
+runTests(100000,tests)
+
