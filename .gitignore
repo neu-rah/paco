@@ -109,3 +109,7 @@ dist
 .vscode/
 workspace.*
 bm
+*.code-workspace
+.bmr/
+trash/
+examples/**/*.json

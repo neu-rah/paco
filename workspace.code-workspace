@@ -2,12 +2,6 @@
 	"folders": [
 		{
 			"path": "."
-		},
-		{
-			"path": "../funjs"
-		},
-		{
-			"path": "examples/json-paco-ast"
 		}
 	],
 	"settings": {

@@ -1,18 +1,10 @@
- "use strict";
+"use strict";
 
- // we depend on:
- //rsite-funjs from https://github.com/neu-rah/funjs
+var it=exports?global:this
+if(!exports) var exports={}
 
- var it=exports?global:this
- if (!exports) var exports={}
- 
- // const assert = require('assert');
-const { log, clog, xlog,mxlog, debugging }=require("./src/debug")
-const { Msg, Expect, Error }=require("./src/error")
-const { SStr }=require("./src/strstr.js")
-
+Object.assign(it,require("./src/debug"))
 Object.assign(it,require("rsite-funjs"))
-
 patchPrimitives(
   Function().__proto__,
   String().__proto__,
@@ -20,368 +12,344 @@ patchPrimitives(
   Object().__proto__,
 )
 
-//////////////////////////////////////////////////////////
-// Parser
-
+Object.assign(it,require("./src/error"))
+const cdom=require("./src/cdom");
+const {clog}=require("./src/debug");
+  
 var config={
   optimize:true,//all optimizations
-  backtrackExclusions: false//debugging//exclude next selector root from current loop match
+  backtrackExclusions: debugging//exclude next selector root from current loop match
 }
 
-Object.assign(it,require("./src/charp"))
-// Object.assign(it,require("./src/primitives"))
-Object.assign(it,require("./src/benchm"))
+const quickParam=p=>typeof p === "string" ? (p.length === 1 ? is(p) : string(p)) : p
+const consume=o=>io=>o.consume(io)
+const ranges=o=>o.ranges()
 
-const quickParam=p=>typeof p === "string" ? (p.length === 1 ? char(p) : string(p)) : p
-
-const highOrder=o=>o.highOrder()
-const canFail=o=>o.canFail()
-var uniqueId=0
-
-class Parser extends Function {
-  constructor() {
-    super('...args', 'return this.__self__.run(...args)')
-    var self=this.bind(this)
-    this.__self__=self
-    if(debugging) self.uid=uniqueId++
-    return self
-  }
-  // _run(...args){return this.run(...args)}
+class Parser {
+  get expect() {return (this.msg||(this.msg=this.name))/*.split("\\").join("\\\\")*/}
+  fail(io) {return Left(Pair(new Expect(this.expect),io.snd()))}
+  failMsg(msg) {this.msg=msg;return this}
+  //top level, check and formats params, can accept a string to initiate the io object
+  parse(io) {io=io||"";return this.run(typeof io==="string"?Pair([],io):io)}
+  //low level parsing, this is the default for a parser
+  //chains and mods can do otherwise (override)
+  chk(o) {return false}
+  run(io) {return this.chk(io.snd().head())?this.consume(io):this.fail(io)}
+  get parser() {return this.run.bind(this)}
   highOrder() {return false}
-  canFail() {return false}
-  consumes() {return true}
-  safe() {return this.consumes()||this.canFail()}
   root() {return this}
+  same(o) {return this.sameCons(o)}
+  sameCons(o) {return this.constructor===o.constructor}
+  optimize() {return config.optimize?this.optim():this}
   optim() {return this}
   exclude(ex) {return this}
-  parse(s) {return this(Pair(s, []))}
-  post(f) {}
-  simpl() {return Nothing()}
+  ranges() {return cdom.any}
 
-  //link something to this parser
-  static Link=class Link extends Parser {
-    constructor(o) {
+  /////////////////////////////////////////////////////////////////////////
+  // modifiers
+  static Mod=class Mod extends Parser {
+    constructor(target) {
       super()
-      this.target=o
+      this.target=target
+    }
+    run(io) {return this.target.run()}
+    chk(o) {return this.target.chk(o)}
+    highOrder() {return this.target.highOrder()}
+    root() {return this.target.root()}
+    ranges() {return this.target.ranges()}
+    same(o) {return this.target.same(o)}
+    optim() {
+      this.target=this.target.optim()
+      return this
     }
     exclude(ex) {
       this.target=this.target.exclude(ex)
       return this
     }
-    map(f) {new Link(f(this.target))}
-    pure(o) {return new Link(o)}
-    app(o) {return this.pure(this.target(o.target))}
-    highOrder() {return this.target.highOrder()}
-    canFail() {return this.target.canFail()}
-    consumes() {return this.target.consumes()}
-    root() {return this.target.root?this.target.root():this}
-    simpl() {return this.target.simpl().mbind(this.constructor)}
-  }
-  //chain this parser to another
-  static Chain=class Chain extends Parser.Link {
-    constructor(o,p) {
-      super(o)
-      this.next=p
-    }
-    exclude(ex) {
-      super.exclude(ex)
-      this.next=this.next.exclude(ex)
-      return this
-    }
-    map(f) {return new Chain(f(this.target))}
-    pure(o,p) {return new Chain(o,p)}//?
-    app(o) {return this.pure(this.target(o.target,this).next(o.next))}
-    highOrder() {return this.target.highOrder()||this.next.highOrder()}
-    canFail() {return this.target.canFail()||this.next.canFail()}
-    consumes() {return this.target.consumes()||this.next.consumes()}
-    simpl() {
-      var t=this.target.simpl()
-      var n=this.next.simpl()
-      return (t.or(n)).then(Just(new this.constructor(
-        fromJust(t.or(Just(this.target))),
-        fromJust(n.or(Just(this.next)))
-      )))
-    }
-  }
-  static Exclusive=class Exclusive extends Parser.Chain {
-    constructor(o,p,op) {
-      super(o,p)
-      this.op=op
-    }
-    exclude(ex) {return this}
-    optim() {
-      // process.stdout.write(".")
-      // clog("op:",this.expect)
-      if(this.op||!config.optimize) return this
-      this.target=this.target.exclude(this).optim()
-      this.op=true
-      this.next=this.next.optim()
-      return this
-    }
-    // optim() {return this}
   }
 
-  static Post=class Post extends Parser.Link {
+  static Post=class Post extends Parser.Mod {
     constructor(o,f) {
       super(o)
       this.func=f
     }
-    get expect() {return "["+this.target.expect+"]->Post process"}
-    run(io) {return this.func(this.target(io))}
+    get name() {return "["+this.target.expect+"]->Post process"}
+    run(io) {return this.func(this.target.run(io))}
   }
-  post(f) {return new Parser.Post(this,f)}
+  post(f) {return new Parser.Post(this,f).optimize()}
 
-  static Verify=class Verify extends Parser.Link {
-    constructor(o,f,m) {
+  static Verify=class Verify extends Parser.Post {
+    get name() {return "["+this.target.expect+"]->verify!"}
+    run(io) {
+      const r=this.target.run(Pair([],io.snd()))
+      if(isLeft(r)) return r
+      if(this.func(fromRight(r).fst())) return r.map(map(x=>io.fst().append(x)))
+      return this.fail(io)
+    }
+  }
+  verify(f,m) {return new Parser.Verify(this,f,m).optimize()}
+
+  /////////////////////////////////////////////////////////////////////////
+  // chains
+  static Chain=class Chain extends Parser.Mod {
+    constructor(target,next) {
+      super(target)
+      this.next=next
+    }
+    optim() {
+      // clog("optim",this.expect)
+      this.target.optim()
+      this.next.optim()
+      if((!this.op)&&this.target.highOrder()&&!this.next.highOrder()) {
+        // clog("optimizing",this.expect)
+        this.op=true
+        if(config.backtrackExclusions) this.target=this.target.exclude(this)
+      }        
+      return this
+    }
+    highOrder() {return this.target.highOrder()||this.next.highOrder()}
+  }
+
+  static As=class As extends Parser.Mod {
+    constructor(o,f) {
       super(o)
       this.func=f
-      this.msg=m
     }
-    get expect() {return "["+this.target.expect+"]->verify!"}
-    run(io) {
-      const r=this.target(Pair(io.fst(),[]))
-      if(isLeft(r)) return r
-      if(this.func(fromRight(r).snd())) return r.map(map(x=>io.snd().append(x)))
-      return Left(Pair(io.fst(),new Error(this.msg)))
+    get name() {
+      const xfname=f=>{//aux
+        if(debugging) {
+          const ff=f.name || f.toString()
+          return ff.length < 15 ? ff : ff.substr(0, 12)+"..."
+        }
+        return f.name || "..."//do not show code!
+      }
+      return debugging?"("+this.target.expect+")->as("+xfname(this.func)+")":this.target.expect
     }
-  }
-  verify(f,m) {return new Parser.Verify(this,f,m)}
-
-  static Then=class Then extends Parser.Exclusive {
-    get expect() {return this.target.expect+" then "+this.next.expect}
-    run(io) {return io.mbind(this.target).mbind(this.next)}
-  }
-  then(p,op) {return new Parser.Then(this,quickParam(p),op).optim()}
-
-  static Skip=class Skip extends Parser.Exclusive {
-    get expect() {return this.target.expect+"\nskip "+this.next.expect}
     run(io) {
-      const os=io.mbind(this.target)
-      return os.mbind(this.next).map(map(o=>snd(fromRight(os))))
+      return Pair([],io.snd())
+        .mbind(this.target.parser)
+        .map(o=>Pair(io.fst().append(this.func(o.fst())),o.snd()))
     }
   }
-  skip(p,op) {return new Parser.Skip(this,quickParam(p),op).optim()}
+  as(f) {return new Parser.As(this,f).optimize()}
+  join(sep="") {return this.as(o=>o.join(sep))}
 
-  static LookAhead=class LookAhead extends Parser.Exclusive {
-    get expect() {return this.target.expect+" but look ahead for "+this.next.expect}
-    root() {return this.target.root().lookAhead(this.next.root(),true)}
-    consumes() {return this.target.consumes()}
+  static Then=class Then extends Parser.Chain {
+    get name() {return this.target.expect+" then "+this.next.expect}
+    run(io) {return io.mbind(this.target.parser).mbind(this.next.parser)}
+  }
+  _then(o) {return new Parser.Then(this,o)}
+  then(o) {return this._then(quickParam(o)).optimize()}
+
+  static Skip=class Skip extends Parser.Then {
+    get name() {return this.target.expect+" skip "+this.next.expect}
     run(io) {
-      const r=this.target(io)
-      const ps=r.mbind(this.next)
+      const os=io.mbind(this.target.parser)
+      return os.mbind(this.next.parser).mbind(o=>Right(Pair(fromRight(os).fst(),o.snd())))
+    }
+  }
+  _skip(o) {return new Parser.Skip(this,o)}
+  skip(o) {return this._skip(quickParam(o).optimize())}
+
+  static LookAhead=class LookAhead extends Parser.Chain {
+    get name() {return this.target.expect+" followed by "+this.next.expect}
+    run(io) {
+      const r=this.target.run(io)
+      const ps=r.mbind(this.next.parser)
       if (isLeft(ps)) return ps
       return r
     }
   }
-  lookAhead(p,op) {return new Parser.LookAhead(this,quickParam(p,op)).optim()}
+  _lookAhead(o) {return new Parser.LookAhead(this,o)}
+  lookAhead(o) {return this._lookAhead(quickParam(o)).optimize()}
 
-  static Excluding=class Excluding extends Parser.Exclusive {
-    get expect() {return this.target.expect+" excluding "+this.next.expect}
-    root() {return this.target.root().excluding(this.next.root(),true)}
-    canFail() {return this.target.canFail()||!this.next.canFail()}
-    consumes() {return this.target.consumes()}
+  static Excluding=class Excluding extends Parser.Chain {
+    get name() {return this.target.expect+" excluding "+this.next.expect}
+    chk(o) {return this.target.chk(o)&&!this.next.chk(o)}
     run(io) {
-      const ps=this.next(io)
-      if (isRight(ps)) return Left(Pair(io.fst(), new Expect(this.expect)))
-      return this.target(io)
+      const ps=this.next.run(io)
+      if (isRight(ps)) return this.fail(io)
+      return this.target.run(io)
     }
   }
-  excluding(p,op) {return new Parser.Excluding(this,quickParam(p,op)).optim()}
+  _excluding(o) {return new Parser.Excluding(this,o)}
+  excluding(o) {return this._excluding(quickParam(o)).optimize()}
 
   static NotFollowedBy=class NotFollowedBy extends Parser.Chain {
-    get expect() {return this.target.expect+" excluding "+this.next.expect}
-    root() {return this.target.root().notFollowedBy(this.next.root(),true)}
-    optim() {return new Parser.NotFollowedBy(this.target.optim(),this.next.optim())}
-    canFail() {return this.target.canFail()||!this.next.canFail()}
-    consumes() {return this.target.consumes()}
+    get name() {return this.target.expect+" not followed by "+this.next.expect}
     run(io) {
-      const os=this.target(io)
-      const ps=os.mbind(this.next)
-      return isLeft(ps) ? os : Left(Pair(io.fst(), new Expect(this.expect)))
+      const os=this.target.run(io)
+      const ps=os.mbind(this.next.parser)
+      return isLeft(ps) ? os : this.fail(io)
     }
   }
-  notFollowedBy(p) {return new Parser.NotFollowedBy(this,quickParam(p))}
+  _notFollowedBy(o) {return new Parser.NotFollowedBy(this,o)}
+  notFollowedBy(o) {return this._notFollowedBy(quickParam(o)).optimize()}
 
-  static Or=class Or extends Parser.Chain {
-    get expect() {return this.target.expect+" or "+this.next.expect}
-    root() {return this.target.root().or(this.next.root())}
-    optim() {return new Parser.Or(this.target.optim(),this.next.optim())}
-    consumes() {return this.target.consumes()||this.next.consumes()}
-    run(io) {
-      const r=this.target(io)
-      if (isRight(r)) return r;//break `or` parameter expansion
-      return r.or(this.next(io)).or(Left(Pair(io.fst(), new Expect(this.expect))))
-    }
-    simplify() {
-      if(this.target.constructor===Satisfy&&this.next.constructor===Satisfy)
-        return Just(satisfy(isMatch(this.target.ch,this.next.ch)))
-    }
-  }
-  or(p) {return new Parser.Or(this,quickParam(p))}
+  or(o) {return _match(this,o)}
 
-  static  FailMsg=class FailMsg extends Parser.Link {
-    constructor(o,msg) {
-      super(o)
-      this.msg=msg
-    }
-    get expect() {return this.msg}
-    optim() {return new Parser.FailMsg(this.target.optim(),this.msg)}
-    run(io) {
-      return this.target(io).or(Left(Pair(io.fst(), new Error(this.msg))))
-    }
-  }
-  failMsg(msg) {return new Parser.FailMsg(this,msg)}
-
-  static As=class As extends Parser.Link {
-    constructor(o,f) {
-      super(o)
-      this.func=f
-    }
-    optim() {return new Parser.As(this.target.optim(),this.func)}
-    get expect() {
-      const xfname=f=>{//aux
-        const ff=f.name || f.toString()
-        return ff.length < 15 ? ff : ff.substr(0, 12)+"..."
-      }
-      return "("+this.target.expect+")->as("+xfname(this.func)+")"
-    }
-    run(io) {
-      return Pair(io.fst(),[])
-        .mbind(this.target)
-        .map(map(this.func))
-        .map(map(x=>io.snd().append(x)))
-    }
-  }
-  as(f) {return new Parser.As(this,f)}
-  
-  static Join=class Join extends Parser.Link {
-    constructor(o,p) {
-      super(o)
-      this.func=p
-    }
-    optim() {return new Parser.Join(this.target.optim(),this.func)}
-    get expect() {return typeof this.func === "undefined" ? "("+this.target.expect+")->join()" : "("+this.target.expect+")->join(\""+this.func+"\")"}
-    run(io) {
-      return typeof this.func === "undefined" ? 
-        this.target.as(mconcat)(io) : 
-        this.target.as(o=>o.join(this.func))(io)   
-    }
-  }
-  join(p) {return new Parser.Join(this,p)}
-
-  static To=class To extends Parser.Link {
+  static To=class To extends Parser.Mod {
     constructor(o,tag) {
       super(o)
       this.tag=tag
     }
-    optim() {return new Parser.To(this.target.optim(),this.tag)}
-    get expect() {return "("+this.target.expect+")->tagged as(\""+this.tag+"\")"}
+    get name() {return "("+this.target.expect+")->tagged as(\""+this.tag+"\")"}
     run(io) {
-      const mktag=lr=>{
-        // if(isLeft(r)) return r
-        const fr=fromRight(lr)
-        const r=fr.snd()
-        const i=r.length===1?r[0]:r
-        if(typeof io.snd().last()==="object") {
-          io.snd().last()[this.tag]=i//no copy, modify object
-          return Right(Pair(fr.fst(),io.snd()))
-        }
+      const o=this.target.run(Pair([],io.snd()))
+      if(o.isLeft()) return o
+      const r=o.fromRight()
+      const i=io.fst()
+      if(i.length&&typeof i.last()==="object")
+        i.last()[this.tag]=r.fst()
+      else {
         const ro={}
-        ro[this.tag]=i
-        r[r.length-1]=ro
-        return Right(Pair(fr.fst(),io.snd().append(r)))
+        ro[this.tag]=r.fst()
+        i.push(ro)
       }
-      const r=this.target.post(mktag)(Pair(io.fst(),[]))
-      return r
+      return Right(Pair(i,r.snd()))
     }
   }
-  to(tag) {return new Parser.To(this,tag)}
+  to(tag) {return new Parser.To(this,tag).optimize()}
+
 }
 
-//meta-parsers ans parser compositions/alias
-class Meta extends Parser.Link {
-  constructor(iofunc,noFail,consumes) {
-    super(iofunc)
-    this.noFail=typeof noFail==="undefined"?true:noFail
-    this.willConsume=typeof consumes==="undefined"?true:consumes
+/////////////////////////////////////////////////////////////////////////////////////////////
+// parsers
+//
+/////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+class CharParser extends Parser {
+  consume(io) {return Right(Pair(io.fst().append(head(io.snd())),tail(io.snd())))}
+}
+
+class Sel extends CharParser {
+  constructor(sel) {super();this.sel=sel}
+}
+
+class Any extends CharParser {
+  chk(o) {return typeof o!=="undefined"}
+}
+const any=new Any()
+
+class Is extends Sel {
+  get name() {return "'"+this.sel+"'"}
+  same(o) {return this.sameCons(o)&&this.sel[0]===o.sel[0]}
+  chk(o) {return this.sel===o}
+  ranges() {return cdom.range(this.sel,this.sel)}
+}
+const is=o=>new Is(o)
+
+class Str extends Sel {
+  get name() {return this.msg||("string \""+this.sel+"\"")}
+  same(o) {return this.sameCons(o)&&this.sel===o.sel}
+  ranges() {return cdom.range(this.sel.head(),this.sel.head())}
+  consume(io) {return Right(Pair(io.fst().append(this.sel),io.snd().substr(this.sel.length)))}
+  run(io) {
+    return io.snd().startsWith?(//is it a string?
+      io.snd().startsWith(this.sel)?this.consume(io):this.fail(io)
+    ):(foldr1(a=>b=>b._then(a,true))(this.str.split("").map(o=>is(o))).join())(io)
   }
-  get expect() {return "Meta!"}
-  run(io){return this.target(io)}
-  optim() {return this}
-  exclude(ex) {return this}
-  canFail() {return !this.noFail}
-  highOrder() {return this.noFail}
-  consumes() {return this.willConsume}
-  simpl() {return Nothing()}
 }
+const string=s=>new Str(s)
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// Combinators -----------------------------------------------------------------------------------//
-//                                                                                                //
-//                                                                                                //
-////////////////////////////////////////////////////////////////////////////////////////////////////
+class Range extends CharParser {
+  constructor(a,z) {
+    super()
+    this.a=a
+    this.z=z
+  }
+  get name() {return this.msg||("'"+this.a+"' to '"+this.z+"'")}
+  same(o) {return this.sameCons(o)&&this.a===o.a&&this.z===o.z}
+  chk(o) {return this.a<=o&&o<=this.z}
+  ranges() {return cdom.range(this.a,this.z)}
+}
+const range=(a,z,m)=>new Range(a,z,m)
+
+const Match=class Match extends CharParser {
+  constructor(...oo) {
+    super()
+    this.sel=oo
+  }
+  get name() {return this.sel.map(x=>x.expect).join(" or ")}
+  highOrder() {return true}//TODO: add rules for this and remove highOrder
+  run(io) {
+    const orChk=oo=>{
+      if(!oo.length) return this.fail(io)
+      var r=oo.head().run(io)
+      if(isRight(r)) return r
+      return orChk(oo.tail())
+    }
+    return orChk(this.sel)
+  }
+  chk(o) {return this.sel.foldr(a=>b=>a.chk(o)||b)(false)}
+  ranges() {return cdom.union(...this.sel.map(ranges))}
+}
+const _match=(...oo)=>new Match(...oo)
+const match=(...oo)=>_match(...oo.map(quickParam))
+
+class OneOf extends Sel {
+  get name() {return "one of \""+this.sel+"\""}
+  chk(o) {return this.sel.indexOf(o)!==-1}
+  ranges() {return cdom.union(...this.sel.split("").map(o=>is(o).ranges()))}
+}
+const oneOf=sel=>new OneOf(sel)
+
+class NoneOf extends Sel {
+  get name() {return "none of \""+this.sel+"\""}
+  chk(o) {return this.sel.indexOf(o)===-1}
+  ranges() {
+    const l=this.sel.split("")
+    const p=l.zipWith(a=>z=>cdom.range(cdom.next(a),cdom.prev(z)))(l.tail())
+    return cdom.union(cdom.lt(l.head()),...p,cdom.gt(l.last()))
+  }
+
+}
+const noneOf=sel=>new NoneOf(sel)
+
+class Many extends Parser.Mod {
+  get name() {return "many ["+this.target.expect+"]"}
+  highOrder() {return true}
+  exclude(ex) {
+    if(config.backtrackExclusions&&!ex.next.root().highOrder()) {
+      const i=cdom.intersect(this.ranges(),ex.next.ranges()).simplify()
+      clog("backtrackExclusions",
+      i.reverse()
+        .map(x=>x.toString())
+        .join(" ⇔ ")
+        .split("\n").join("\\n")
+        .split("\r").join("\\r")
+        .split("\t").join("\\t")
+      ,(i.reverse(),""))
+      if(i.length===1||i.head().isEmpty()) return this
+      clog("excluding...",i.head()+"")
+      switch(ex.constructor.name) {
+        case "Excluding": return many(this.target.excluding(ex.next.root(),true))
+        case "LookAhead": return many(this.target.lookAhead(ex.next.root(),true))
+        default:
+          return many(
+            this.target.excluding(ex.next.root())
+            .or(this.target.lookAhead(ex.next.root()))
+          )
+      }
+    }
+    return this
+  }
+  run(io) {return this.target._then(_many(this.target),true).run(io).or(Right(io))}
+}
+const _many=(o,m)=>new Many(o,m)
+const many=(o,m)=>_many(quickParam(o),m).optimize()
+
+const _some=p=>(p._then(_many(p),true)).failMsg("at least one "+p.expect)
+const some=p=>_some(quickParam(p))
+
 class None extends Parser {
-  constructor() {
-    super()
-  }
-  get expect() {return "none"}
-  consumes() {return false}
+  get name() {return "none"}
   run(io) {return Right(io)}
+  ranges() {return cdom.none}
 }
-//parser always succeedes without consuming
-// also an "id" combinator to apply continuations on root elements
 const none=new None()
-
-class Skip extends Parser.Link {
-  get expect() {return "skip "+this.target.expect}
-  run(io) {return none.skip(this.target,true)(io)}
-}
-//apply skip (continuation) to the root element, using `none` combinator
-const skip=o=>new Skip(quickParam(o))
-
-class Satisfy extends Parser {
-  constructor(chk) {
-    super()
-    this.ch=chk
-  }
-  get expect() {return this.ch.expect || "to satisfy condition"}
-  canFail() {return this.ch.canFail}
-  consumes() {return this.ch.consumes}
-  simpl() {return this.ch.simplify().map(satisfy)}
-  run(io) {
-    return this.ch.match(head(io.fst())) ?
-      Right(//success...
-        Pair(//build a pair of remaining input and composed output
-          tail(io.fst()),//consume input
-          io.snd().append([head(io.fst())])))//compose the outputs
-      : Left(Pair(io.fst(), new Expect(this.expect)))//or report error
-  }
-}
-//check a character with a boolean function
-const satisfy=chk=>new Satisfy(chk)
-
-const any=satisfy(isAnyChar)
-
-class Str extends Parser {
-  constructor(str) {
-    super()
-    this.str=str
-  }
-  get expect() {return "string `"+this.str+"`"}
-  run(io) {
-    return io.fst().startsWith?(
-      io.fst().startsWith(this.str)?
-        Right(Pair(io.fst().substr(this.str.length),io.snd().append(this.str))):
-        Left(Pair(io.fst(),new Expect(this.expect)))
-      ):(foldr1(a=>b=>b.then(a,true))(this.str.split("").map(o=>char(o))).join())(io)
-  }
-}
-// //match a string
-const string=str=>new Str(str)
-// case-insensitive string match
-const caseInsensitive=str=>new Meta(
-  io=>(foldr1(a=>b=>b.then(a,true))(str.split("").map(o=>cases(o))).join())(io)
-).failMsg("non case-sensitive form of string `"+str+"`")
 
 class Regex extends Parser {
   constructor(e) {
@@ -389,15 +357,15 @@ class Regex extends Parser {
     this.expr=RegExp(e,"y")
     this.expr.lastIndex=0
   }
-  get expect() {return "regex "+this.expr}
+  get name() {return "regex "+this.expr}
   run(io) {
-    const r=io.fst().match(this.expr)
+    const r=io.snd().match(this.expr)
     return r === null ?
-      Left(Pair(io.fst(), new Expect(this.expect))) :
+      Left(Pair(new Expect(this.expect),io.snd())) :
       Right(
         Pair(
-          r.input.substr(r.index+r[0].length),
-          r.length === 1 ? [r[0]] : r.slice(1, r.length)
+          r.length === 1 ? [r[0]] : r.slice(1, r.length),
+          r.input.substr(r.index+r[0].length)
         )
       )
   }
@@ -405,145 +373,176 @@ class Regex extends Parser {
 //regex match
 const regex=e=>new Regex(e)
 
-// //character parsers
-const anyChar=satisfy(isAnyChar)
-const char=c=>satisfy(isChar(c))
-const cases=c=>satisfy(anyCase(c))
-const oneOf=cs=>satisfy(isOneOf(cs))
-const noneOf=cs=>satisfy(isNoneOf(cs))
-const range=curry((a, z)=>satisfy(inRange(a, z)))
-const digit=satisfy(isDigit)
-const lower=satisfy(isLower)
-const upper=satisfy(isUpper)
-const letter=satisfy(isLetter)
-const alphaNum=satisfy(isAlphaNum)
-const hexDigit=satisfy(isHexDigit)
-const octDigit=satisfy(isOctDigit)
-const space=satisfy(isSpace).failMsg("space")
-const tab=satisfy(isTab).failMsg("tab")
-const nl=satisfy(is_nl).failMsg("new-line")
-const cr=satisfy(is_cr).failMsg("carriage return")
-const blank=satisfy(isBlank)
-const eof=skip(satisfy(isEof))
-const eol=skip(satisfy(isEol))
+class ManyTill extends Parser.Mod {
+  constructor(p,e) {
+    super(p)
+    this.end=e
+  }
+  get name() {return "many "+this.target.expect+" until "+this.end.expect}
+  highOrder() {return true}
+  run(io) {return this.target._excluding(this.end)._then(_manyTill(this.target,this.end)).run(io).or(Right(io))}
+}
+const _manyTill=(p,e)=>new ManyTill(p,e)
+const manyTill=curry((p,e)=>_manyTill(quickParam(p),quickParam(e)).optimize())
 
-const optional=p=>new Meta(io=>p(io).or(Right(io))).failMsg("optional "+p.expect,true)//never fails
+class Count extends Parser.Mod {
+  constructor(n,p) {
+    super(p)
+    this.cnt=n
+  }
+  get name() {return this.cnt+" of "+this.target.expect}
+  root() {return this}
+  run(io) {return this.cnt ? this.target._then(_count(this.cnt-1,this.target)).run(io) : Right(io)}//TODO: use a cycle instead!
+}
+const _count=(n,p)=>new Count(n,p)
+const count=curry((n,p)=>_count(n,quickParam(p)).optimize())
+
+class Between extends Parser.Mod {
+  constructor(o,c,p) {
+    super(p)
+    this.open=o
+    this.close=c
+  }
+  get name() {return this.target.expect+" between "+this.open.expect+" and "+this.close.expect}
+  run(io) {return _skip(this.open)._then(this.target)._skip(this.close).run(io)}
+}
+const _between=(open,close,p)=>new Between(open,close,p)
+const between=curry((open,close,p)=>_between(
+  quickParam(open),
+  quickParam(close),
+  quickParam(p)).optimize())
+
+class Option extends Parser.Mod {
+  constructor(x,p) {
+    super(p)
+    this.default=x
+  }
+  get name() {return "option "+this.target.expect+" else "+this.default}
+  run(io) {return this.target.run(io).or(Right(Pair([this.default],io.snd())))}
+}
+const _option=(x, p)=>new Option(x,p)
+const option=curry((x, p)=>_option(x,quickParam(p)).optimize())
+
+class OptionMaybe extends Parser.Mod {
+  get name() {return "maybe "+p.expect}
+  run(io) {return this.target.as(Just).run(io).or(Right(Pair(Nothing(),io.snd())))}
+}
+const _optionMaybe=p=>new OptionMaybe(p)
+const optionMaybe=(p=>_optionMaybe(quickParam(p)).optimize())
+
+class SepBy extends Parser.Mod {
+  constructor(p,sep) {
+    super(p)
+    this.sep=sep
+  }
+  get name() {return this.target.expect+" separated by "+this.sep.expect}//never fails
+  highOrder() {return true}
+  run(io) {return this.target._then(_many(_skip(this.sep)._then(this.target))).run(io).or(Right(io))}
+}
+const _sepBy=(p, sep)=>new SepBy(p,sep)
+const sepBy=curry((p, sep)=>_sepBy(quickParam(p),quickParam(sep)).optimize())
+
+class SepBy1 extends SepBy {
+  get name() {return this.target.expect+" separated by "+this.sep.expect}
+  run(io) {return this.target._then(_many(_skip(this.sep)._then(this.target))).run(io)}
+}
+const _sepBy1=(p,sep)=>new SepBy(p,sep)
+const sepBy1=curry((p,sep)=>_sepBy1(quickParam(p),quickParam(sep)).optimize())
+
+class EndBy extends SepBy {
+  get name() {return this.target.expect+" separated and ending with "+this.sep.expect}
+  run(io) {return _sepBy(p,sep)._then(_skip(sep)).run(io).or(Right(io))}
+  get name() {return }
+  run(io) {return }
+}
+const _endBy=(p,sep)=>new EndBy(p,sep)
+const endBy=curry((p,sep)=>_endBy(quickParam(p),quickParam(sep)).optimize())
+  
+class EndBy1 extends EndBy {
+  get name() {return "at least one of "+this.target.expect+" separated and ending with "+this.sep.expect}
+  run(io) {return _sepBy1(this.target,this.sep)._then(_skip(this.sep),true).run(io)}
+}
+const _endBy1=(p,sep)=>new EndBy1(p,sep)
+const endBy1=curry((p,sep)=>_endBy1(quickParam(p),quickParam(sep)).optimize())
+
+class Skip extends Parser.Mod {
+  get name() {return "skip "+this.target.expect}
+  run(io) {return none._skip(this.target).run(io)}
+}
+const _skip=o=>new Skip(o)
+const skip=o=>_skip(quickParam(o)).optimize()
+
+const digit=range('0','9').failMsg("digit")
+const octDigit=range('0','7').failMsg("octal digit")
+const hexDigit=match(digit,range('a','f'),range('A','F')).failMsg("hexadecimal digit")
+const lower=range('a','z').failMsg("lower-case")
+const upper=range('A','Z').failMsg("upper-case")
+const letter=match(lower,upper).failMsg("letter")
+const alphaNum=match(lower,upper,digit).failMsg("alpha-numeric")
+const space=new Is(' ').failMsg("space")
+const tab=new Is('\t').failMsg("tab")
+const nl=new Is('\n').failMsg("new-line")
+const cr=new Is('\n').failMsg("carriage return")
+const blank=match(space,tab).failMsg("white-space")
+
+// Satisfy function: Char->Bool
+class Satisfy extends Sel {
+  same(o) {return this.sel===o.sel}
+  chk(o) {return this.sel(o)}
+} const satisfy=(f,m)=>new Satisfy(f,m)
+
+class EOF extends CharParser {
+  get name() {return "end-of-file"}
+  chk(o) {return typeof o==="undefined"}
+  consume(io) {return Right(io)}
+} const eof=new EOF()
+const eol=_match(nl,eof).failMsg("end of line or file")
+
+class Optional extends Parser.Mod {
+  get name() {return "optional "+this.target.expect}
+  run(io) {return this.target.run(io).or(Right(io))}
+}
+const _optional=p=>new Optional(p)
+const optional=p=>_optional(quickParam(p)).optimize()
 const choice=ps=>foldl1(a=>b=>a.or(b))(ps)
 
-class Many extends Parser.Link {
-  constructor(o){
-    super(o)
-    // if(debugging&&o.consumes()&&!(o.safe()&&o.canFail())) clog("warning: many should not be requested with a parser that can not fail or might not consume")
-  }
-  get expect() {return "many("+this.target.expect+")"}//never fails
-  static canFail() {return false}
-  static consumes() {return false}
-  safe() {return this.target.consumes()&&!(this.target.canFail()&&this.target.safe())}
-  static highOrder() {return true}
-  exclude(ex) {
-    if(config.backtrackExclusions&&!ex.next.root().highOrder())
-      switch(ex.constructor.name) {
-        case "Excluding": return many(this.target.excluding(ex.next.root(),true))
-        case "LookAhead": return many(this.target.lookAhead(ex.next.root(),true))
-        default:
-          return many(
-            this.target.excluding(ex.next.root(),true)
-            .or(this.target.lookAhead(ex.next.root(),true))
-          )
-      }
-    return this
-  }
-  run(io) {
-    // clog("many parsing:",io)
-    var r=this.target.then(many(this.target),true)(io).or(Right(io))
-    // clog("many parsed to:",r.value)
-    // if(isLeft(r)) return r
-    return r//fromRight(r).mbind(o=>o.mbind(many(this.target)))
-  }
-}
-const many=p=>new Many(quickParam(p))
-
-const many1=p=>(quickParam(p).then(many(p),true)).failMsg("at least one "+p.expect)
-
-const manyTill=curry((p,e)=>new Meta(
-  io=>{
-    p=quickParam(p)
-    e=quickParam(e)
-    return p.excluding(e,true).then(manyTill(p,e),true)(io).or(Right(io))
-  }
-).failMsg("many "+p.expect+" until "+e.expect))//never fails
-
-const count=curry((n,p)=>(p=>new Meta(
-  io=>n ? p.then(count(n-1,p),true)(io) : Right(io),!p.canFail()
-).failMsg(n+" of "+p.expect))(quickParam(p)))
-
-const between=curry((open,close,p)=>
-  skip(quickParam(open))
-  .then(quickParam(p),true)
-  .skip(quickParam(close),true))
-
-const option=curry((x, p)=>(p=>new Meta(
-  io=>p(io).or(Right(Pair(io.fst(), [x]))),true
-).failMsg("option "+p.expect+" else "+x))(quickParam(p)))//never fails
-
-const optionMaybe=p=>(p=>new Meta(
-  io=>p.as(Just)(io).or(Right(Pair(io.fst(), Nothing()))),true
-).failMsg("maybe "+p.expect))(quickParam(p))//never fails
-
-const sepBy=curry((p, sep)=>(p=>sep=>new Meta(
-  io=>p.then(many(skip(sep).then(p,true)),true)(io).or(Right(io)),true
-).failMsg(p.expect+" separated by "+sep.expect))(quickParam(p))(quickParam(sep)))//never fails
-
-const sepBy1=curry((p,sep)=>(p=>sep=>
-  p.then(many(skip(sep).then(p,true)),true)
-  .failMsg(p.expect+" separated by "+sep.expect))(quickParam(p))(quickParam(sep)))
-
-const endBy=curry((p,sep)=>(p=>sep=>new Meta(//TODO: review this, can not use sepBy
-  io=>sepBy(p)(sep).then(skip(sep),true)(io).or(Right(io)),!(sep.canFail()||p.canFail())
-).failMsg(p.expect+" separated and ending with "+sep.expect))(quickParam(p))(quickParam(sep)))
-
-const endBy1=curry((p,sep)=>(p=>sep=>
-  sepBy1(p)(sep).then(skip(sep),true)
-  .failMsg("at least one of "+p.expect+" separated and ending with "+sep.expect))
-  (quickParam(p))(quickParam(sep)))
-
-// high order character parser
-const spaces=many(space).failMsg("spaces")
-const spaces1=many1(space).failMsg("some space")
-const blanks=many(blank).failMsg("white-space")
-const blanks1=many1(blank).failMsg("some white-space")
 const digits=many(digit).failMsg("digits")
-const digits1=many1(digit).failMsg("some digits")
-const letters=many(letter).failMsg("letters")
-const letters1=many1(letter).failMsg("some letters")
+const spaces=many(space).failMsg("spaces")
+const blanks=many(blank)
+const letters=many(letter)
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+// top level parsing and results
 
 // //interpret a result and enventually build an error message
 const res=curry((fn, r)=>{
-  if (isRight(r)) return r.map(snd)
+  if (isRight(r)) return r.map(fst)
   else {
     // fn=typeof fn==="undefined"?">":fn
     const rr=fromLeft(r)
     var fpos=fn
-    if (typeof rr.fst().line !== "undefined") {
+    if (typeof rr.snd().line !== "undefined") {
       const pos=rr.fst().getPos()
       fpos += ":"+pos.join(":")+"\n"
     }
-    const found=head(rr.fst())//the char to blame
-    return rr.snd().isError() ?
-    Left(fpos+"error, "+rr.snd()) :
+    const found=head(rr.snd())//the char to blame
+    return rr.fst().isError() ?
+    Left(fpos+"error, "+rr.fst()) :
     Left(
-        fpos+"error, expecting "+rr.snd()
+        fpos+"error, expecting "+rr.fst()
        +" but found `"+(found || "eof")+"`"
-       +(found?" here->"+rr.fst().toString().substr(0,10)+"...":"")//TODO: this is expensive, refactor! (functional `take n`)
+       +(found?" here->"+rr.snd().toString().substr(0,10)+"...":"")//TODO: this is expensive, refactor! (functional `take n`)
       )
   }
 })
 
-const parse=curry((fn, p, str)=>res(fn)(p(Pair(str, []))))
+const parse=curry((fn, p, str)=>res(fn)(p.run(Pair([],str))))
 
+/////////////////////////////////////////////////////////////////////////////////
+// exporting
 exports.satisfy=satisfy
-exports.anyChar=anyChar
-exports.char=char
+exports.anyChar=any
+exports.char=is
 exports.oneOf=oneOf
 exports.noneOf=noneOf
 exports.range=range
@@ -561,18 +560,19 @@ exports.cr=cr
 exports.blank=blank
 exports.spaces=spaces
 exports.blanks=blanks
-exports.spaces1=spaces1
-exports.blanks1=blanks1
+exports.spaces1=some(space)
+exports.blanks1=some(blank)
 exports.digits=digits
 exports.eof=eof
 exports.string=string
-exports.caseInsensitive=caseInsensitive
+// exports.caseInsensitive=caseInsensitive
 exports.regex=regex
 
 exports.none=none
 exports.skip=skip
 exports.many=many
-exports.many1=many1
+exports.many1=some//many1 deprecated, use some
+exports.some=some
 exports.manyTill=manyTill
 exports.optional=optional
 exports.choice=choice
@@ -587,51 +587,7 @@ exports.endBy1=endBy1
 exports.res=res
 exports.parse=parse
 exports.Pair=Pair
-exports.SStr=SStr
-exports.Meta=Meta
+// exports.SStr=SStr
 exports.config=config
-
-// exports.maps=maps
-
-const chrono=(p,cnt,quiet)=>{
-  const start=new Date()
-  for(var n=cnt;n;n--) p()
-  const end=new Date()
-  const elapsed=end-start
-  const avg=elapsed/cnt
-  if(!quiet)console.log(avg/1000,"s")
-  return avg
-}
-
-const time=(p,n,q)=>io=>chrono(()=>p.parse(io),n||1,q)
-
-exports.chrono=chrono
-exports.time=time
-
-// clog(digit.or(letter).or(alphaNum).simpl())
-// alphaNum.simpl()
-
-const runn=cnt=>function run(name,src,mute) {
-  if(!mute) clog("benchmark -----------------")
-  var start=new Date()
-  for(var n=0;n<cnt;n++) src()
-  var end=new Date()
-  if(!mute) console.log(name,(end-start)*1000/cnt,"us")
-}
-
-const run=runn(10000)
-
-run("test",()=>any.parse("x"),true)
-run("test",()=>false,true)
-run("test",()=>true,true)
-
-const tests=[
-  Pair("string................:",()=>string("ok").parse("ok")),
-  Pair("string with failMsg...:",()=>string("ok").failMsg("wtf!").parse("ok")),
-  Pair("string................:",()=>string("ok").parse("ok")),
-  Pair("string with failMsg...:",()=>string("ok").failMsg("wtf!").parse("ok")),
-  Pair("letter.skip(digits.join()).then(letter)",()=>letter.skip(digits.join()).then(letter).parse("a123X..."))
-]
-
-runTests(100000,tests)
+exports.Parser=Parser
 

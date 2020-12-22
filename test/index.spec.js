@@ -1,27 +1,33 @@
 "use strict";
 
+var mo=exports?global:this
+if(!exports) var exports={}
+
 const assert = require("assert");
 
-const {
-  prev,next,
-  isNone,isAnyChar,isChar,isOneOf,isNoneOf,inRange,notInRange,isLess,isGreater,
-  isDigit,isLower,isUpper,isLetter,isAlphaNum,isHexDigit,isOctDigit,
-  isSpace,isTab,is_nl,is_cr,isBlank,isEof,isNotEof,
-  None,Any,Point,Range,NotRange,Ranges,Less,Greater,Set,Unset,Eof,NotEof
-}=require("../src/primitives")
+Object.assign(mo,require("../src/cdom"))
+Object.assign(mo,require("rsite-funjs"))
+Object.assign(mo,require("../paco"))
+// const {
+//   prev,next,
+//   isNone,isAnyChar,isChar,isOneOf,isNoneOf,inRange,notInRange,isLess,isGreater,
+//   isDigit,isLower,isUpper,isLetter,isAlphaNum,isHexDigit,isOctDigit,
+//   isSpace,isTab,is_nl,is_cr,isBlank,isEof,isNotEof,
+//   None,Any,Point,Range,NotRange,Ranges,Less,Greater,Set,Unset,Eof,NotEof
+// }=require("../src/primitives")
 
-const {
-  patchPrimitives,//patch primitive data types
-  id,fcomp,fchain,constant,flip,cons,//Functional
-  empty,append,mconcat,//Monoid
-  head,tail,//List
-  map,//Functor
-  pure,mbind,//Monad
-  Pair,fst,snd,//Pair (tupple)
-  Maybe,isMaybe,Nothing,isNothing,Just,isJust,fromJust,//Maybe
-  isEither,Left,isLeft,fromLeft,Right,isRight,fromRight,//Either
-  foldable,foldr,foldl,foldr1,foldl1,foldMap,//foldable
-} = require("rsite-funjs");
+// const {
+//   patchPrimitives,//patch primitive data types
+//   id,fcomp,fchain,constant,flip,cons,//Functional
+//   empty,append,mconcat,//Monoid
+//   head,tail,//List
+//   map,//Functor
+//   pure,mbind,//Monad
+//   Pair,fst,snd,//Pair (tupple)
+//   Maybe,isMaybe,Nothing,isNothing,Just,isJust,fromJust,//Maybe
+//   isEither,Left,isLeft,fromLeft,Right,isRight,fromRight,//Either
+//   foldable,foldr,foldl,foldr1,foldl1,foldMap,//foldable
+// } = require("rsite-funjs");
 
 patchPrimitives(
   Function().__proto__,
@@ -30,21 +36,21 @@ patchPrimitives(
   Object().__proto__,
 )
 
-const {
-  anyChar,char,oneOf,noneOf,range,satisfy,skip,
-  digit,lower,upper,letter,alphaNum,hexDigit,octDigit,
-  space,tab,nl,cr,blank,
-  digits,spaces,blanks,spaces1,blanks1,eof,
-  string,regex,many,many1,optional,
-  choice,count,between,option,optionMaybe,sepBy,endBy,endBy1,
-  parse,none,
-}=require("../paco.js")
+// const {
+//   anyChar,char,oneOf,noneOf,range,satisfy,skip,
+//   digit,lower,upper,letter,alphaNum,hexDigit,octDigit,
+//   space,tab,nl,cr,blank,
+//   digits,spaces,blanks,spaces1,blanks1,eof,
+//   string,regex,many,many1,optional,
+//   choice,count,between,option,optionMaybe,sepBy,endBy,endBy1,
+//   parse,none,
+// }=require("../paco.js")
 
 ///////////////////////////////////////////
 // test stuff
 describe("Parser",function() {
   it("parser `none` and utilities",async ()=>{
-    assert.deepStrictEqual(none(Pair("",[])),Right(Pair("",[])),"parser boot, always succeeds, no consume initial parser state")
+    assert.deepStrictEqual(none.run(Pair("",[])),Right(Pair("",[])),"parser boot, always succeeds, no consume initial parser state")
     assert.deepStrictEqual(parse(">")(none)(""),Right([]),"`parse` function")
     assert.deepStrictEqual(parse(">")(char('x'))("x"),Right(["x"]),"char('x')")
     assert(isLeft(parse(">")(char('x'))("")),"eof fail")
@@ -151,7 +157,7 @@ describe("Metaparsers",function() {
     )
     assert.deepStrictEqual(
       parse(">")(many(digit).join())(""),
-      Right([]),"repeat a parser option"
+      Right([""]),"repeat a parser option"
     )
   })
   it("many1",async ()=>{
