@@ -17,7 +17,7 @@ const cdom=require("./src/cdom");
 const {clog}=require("./src/debug");
   
 var config={
-  optimize:true,//all optimizations
+  optimize:false,//all optimizations
   backtrackExclusions: debugging//exclude next selector root from current loop match
 }
 

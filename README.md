@@ -2,6 +2,12 @@
 
 **javascript monadic parser combinators**
 
+> version 1.1 is a full re-write with focus on speed  
+also, output pair content swaped  
+`many1` replaced by `some`  
+`onFailMsg` replaced by `failMsg`  
+Parsers are no longuer functions (they are classes and do not derive from Function anymore) so they must be called with `.run` instead of direct function call.
+
 This is a tool for building parsers and parse, so that you do not have to be a parser expert to do it.
 
 ```javascript
@@ -20,13 +26,13 @@ Right { value: [ 'AN', 123 ] }
 
 All parsers can chain up or group to form other parsers that still can chain up and group.
 
-Some available metaparsers like `many()`, `many1()`, `skip()` can accept other parsers or metaparsers.
+Some available metaparsers like `many()`, `some()`, `skip()` can accept other parsers or metaparsers.
 
 Some parsers are already a composition with metaparsers, that is the case of `digits`, it will perform `many(digit)`.
 
 **abbreviations**
 
-a single string can now be used in place of a non-chaining parser and it will translater either to a `char` or `string` parser.
+a single string can now be used in place of a non-chaining parser and it will translate either to a `char` or `string` parser.
 
 > `digits.then('.')` is valid as `digits.then(char('.'))`
 
@@ -49,7 +55,7 @@ const kchk=
 ```
 ```javascript
 #>res(">")(kchk.parse("temp: +12K"))
-Right { value: [ 'temp: ', { temp: 12, unit: 'K' } ] }
+Right { value: [ { temp: [ 12 ], unit: [ 'K' ] } ] }
 ```
 
 this, along `.verify`, `.post` and `.as` allow event callbacks and all sort of automation during the parsing, if not then let me know.
@@ -59,13 +65,18 @@ this, along `.verify`, `.post` and `.as` allow event callbacks and all sort of a
 Enable with `config.backtrackExclusions=true`
 
 ```javascript
-#>digits.join().as(parseInt).then(digit).parse("1234")
-Right { value: Pair { a: '', b: [ 123, '4' ] } }
+#>config.optimize=true//turn on optimizations on construction
+#>config.backtrackExclusions=true//track exclusions on optimization
+#>digits.join().as(parseInt).then(count(2,digit).join()).parse("12345")
+Right { value: Pair { a: [ 123, '45' ], b: '' } }
 ```
 `.then`, `.skip` and others can inject exclusion checks on the chain at construction time.
 We allow the parser base to be re-writen at construction time, keeping away all checking from parse time.
 
 `many` will peek this injected parameters and possibly exclude them from the sequence match
+
+> one can still call `.optim` even with optimizations turned off  
+however backtrack will still respect its flag
 
 >optimization chain is not very populated yet, there are many things to fit in...
 
@@ -75,7 +86,7 @@ We allow the parser base to be re-writen at construction time, keeping away all 
 
 ```javascript
 var config={
-  optimize:true,//all optimizations
+  optimize:false,//all optimizations
   backtrackExclusions: false//exclude next selector root from current loop match
 }
 ```
@@ -114,6 +125,8 @@ digits.excluding(oneOf("89"))//this will have no effect
 many(digit.excluding(oneOf("89")))//but this will
 ```
 
+> if optimizatumizing wuth exclusion back-track, the the first will have effect
+
 ## .as
 Parse output can be formated with `.as`, it will apply to the parser or group where inserted. `.as` will accept an output transformer function.
 
@@ -132,12 +145,14 @@ TODO: this (grouping) is not fully generalized yet
 ## .post
 `.post(f)` post-processing the result, this is still a static parser definition. Function `f` return will replace the previous result.
 
-## .onFailMsg
+## .failMsg
 `.onFailMsg(msg)` provides a message for a failing parser
 
 ## .parse
 `.parse("...")` can be used to quick feed a string to any parser.
-The result will include both input and output state.  
+The result will include both input and output state.
+
+>ex: `digits.parse("123a")`
 
 _use `parse` function to get only output_
 
@@ -150,7 +165,7 @@ a parser can be stored, combined, passed around and perform parsing on many cont
 this parse will fail as it expects at least one digit
 
 ```javascript
-#>parse(">")(many1(digit))("#123")
+#>parse(">")(some(digit))("#123")
 Left { value: 'error, expecting digit but found `#` here->#123' }
 ```
 ## Composition examples
@@ -158,7 +173,7 @@ Left { value: 'error, expecting digit but found `#` here->#123' }
 ```javascript
   parse(">")( 
     many(
-      many1(digit.or(letter)).join()
+      some(digit.or(letter)).join()
       .skip(spaces)
     ).join("-")
   )("As armas e os baroes")
@@ -232,9 +247,9 @@ _above parser could be writen using `sepBy`, we were just emphasizing the combin
 
 - **blanks** optional many white space
 
-- **spaces1** one or more spaces
+- ~~**spaces1** one or more spaces~~
 
-- **blanks1** one or more white spaces
+- ~~**blanks1** one or more white spaces~~
 
 - **digits** optional many digits
 
@@ -242,7 +257,7 @@ _above parser could be writen using `sepBy`, we were just emphasizing the combin
 
 - **string("...")** match with given string
 
-- **caseInsensitive("...")** non case-sensitive string match
+- ~~**caseInsensitive("...")** non case-sensitive string match~~
 
 - **regex(expr)** match with regex expression
 
@@ -255,7 +270,7 @@ Right { value: [ 'an', '123' ] }
 
 - **many(p)** optional many ocourences or parser `p` targets. This parser never fails as it can return an empty list.
 
-- **many1(p)** one or more ocourences of parser `p` targets
+- **some(p)** one or more ocourences of parser `p` targets
 
 - **manyTill(p,end)** one or more ocourences of parser `p` terminating with parser `end`
 
@@ -265,11 +280,11 @@ Right { value: [ 'an', '123' ] }
 
 - **count(n)(p)** parses `n` ocourences of `p`
 
-- **between(open)(p)(close)** parses `p` surounded by `open` and `close`, dropping the delimiters.  
+- **between(open)(close)(p)** parses `p` surounded by `open` and `close`, dropping the delimiters.  
 Be sure to exclude the delimiters from the content or provide any other meaning of content end
 
 ```javascript
-#>parse(">")(between(space)(many1(noneOf(" ")))(space).join())(" ab.12 ")
+#>parse(">")(between(space,space,some(noneOf(" "))).join())(" ab.12 ")
 Right { value: [ 'ab.12' ] }
 ```
 
@@ -302,28 +317,26 @@ We use it to turn binary combinators into unary metaparsers. That is the case of
 
 > using `none` as `sep` with `endBy(p,sep,end)` whill silentrly skip the `sep` need.
 
-```haskell
-Right . id
-```
-
 ## try and consume
 
 Untill now, all failing parsers do not consume... lets see... while so, no need to inplement **try*
+
+> to be more accurate, failing parsers do consume, we need the failing point on the reports, however the upper parser might pick the starting point to move on, ignoring the consume (as **try** do).
 
 ## Parsers basic IO
 
 For now parsers accept a state pair of (input,output) and will return `Either`:  
 
-- on error: a pair of input state and the error  
-- on success: a pair of input state and the parsed content.
+- on error: a pair of an error and the input state.
+- on success: a pair of parsed content and the input state.
 
-_*expect changes on this arguments format_
+_*expect changes on this arguments format (changed on v1.1)_
 
 testing a simple parser
 
 ```javascript
-#>digits(Pair("123",[]))
-Right { value: Pair { a: '', b: [ '1', '2', '3' ] } }
+#>digits.run(Pair([],"123"))
+Right { value: Pair { a: [ '1', '2', '3' ], b: '' } }
 ```
 This is the basic form of parsing (feeding a parser). 
 
@@ -337,9 +350,8 @@ Same with
 
 ```javascript
 #>digits.parse("123")
-Right { value: Pair { a: '', b: [ '1', '2', '3' ] } }
+Right { value: Pair { a: [ '1', '2', '3' ], b: '' } }
 ```
-
 the only difference is that this last one, as the first will give full output, including the input state.
 
 ## utility
@@ -347,6 +359,8 @@ the only difference is that this last one, as the first will give full output, i
 ### **parse** 
 
 `parse(filename)(parser)(input string or stream)`
+
+the filename is merelly a decoration here, to be used on error report
 
 ```javascript
 #>parse(">")(letter.or(digit))("1")
@@ -370,11 +384,11 @@ Left { value: Pair { a: '#123', b: 'letter or digit' } }
 
 desugared parse
 ```javascript
-#>letter.or(digit)(Pair("1",[]))
+#>letter.or(digit).run(Pair("1",[]))
 Right { value: Pair { a: '', b: [ '1' ] } }
-#>letter.or(digit)(Pair("a",[]))
+#>letter.or(digit).run(Pair("a",[]))
 Right { value: Pair { a: '', b: [ 'a' ] } }
-#>letter.or(digit)(Pair("#123",[]))
+#>letter.or(digit).run(Pair("#123",[]))
 Left { value: Pair { a: '#123', b: 'letter or digit' } }
 ```
 
@@ -399,7 +413,7 @@ as a consequence of the error report system we got a parser description for free
 ```javascript
 const p=
   optional(skip(char('#')))
-  .then(many1(letter).join())
+  .then(some(letter).join())
   .skip(char('-').or(spaces1))
   .then(digits.join().as(parseInt))
 ```
@@ -419,33 +433,5 @@ using:
 #>console.log(parse(">")(p)("#AN-123"))
 Right { value: [ 'AN', 123 ] }
 ```
-
-## Inheritance map
-
-```text
-Parser
-|-None no parse, no consume, no fail
-|-Satisfy verify character with boolean function
-|-Str strings match
-|-Regex regular expression match
-+-*Link parser augmenting (TODO: unless we need other Parser derivates, put this funtionality into Parser)
-  |-*FailMsg override expect msg, present it as error (no final msg composition)
-  |-*As use a function to process a parsing result
-  |-*Verify check result with boolean function anda failing message
-  |-*Post process result
-  |-Skip root skip
-  |-Meta quick build a parser with a function
-  | \-Many repeat a parser
-  +-Chain parser chaining, sort of pure virtual, we make no direct instances of this
-    |-*Or a chain of alternative parsers
-    |-*NotFollowedBy .notFolloed parser extension
-    +-*Exclusive for objects that can inject exclusion and re-write the rules
-      |-*Then parser sequence
-      |-*Skip parse sequence with later content drop
-      |-*LookAhead next parser should be valid althou not "parsed" (consumed) yet
-      \-*Excluding excludes some cases from the current parser
-```
-
-_(*) this classes are embedded into the main Parser class as static members_
 
 _this parser is inspired but not following "parsec"_
