@@ -17,11 +17,11 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "char parser",
+      "name": "char domain",
       "skipFiles": [
         "<node_internals>/**"
       ],
-      "program": "${workspaceFolder}/src/charp.js",
+      "program": "${workspaceFolder}/src/cdom.js",
       "envFile": "${workspaceFolder}/.env",
     }
   ]

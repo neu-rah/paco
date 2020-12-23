@@ -110,6 +110,8 @@ dist
 workspace.*
 bm
 *.code-workspace
+*workspace
+workspace.code-workspace
 .bmr/
 trash/
 examples/**/*.json
