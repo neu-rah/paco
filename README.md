@@ -50,7 +50,8 @@ const kchk=
     .then(digits)
     .join().as(parseInt).to("temp")
     .then(char('K').to("unit"))
-    .verify(o=>o[0].temp>=0,"negative Kelvin!")
+    .verify(o=>o[0].temp>=0)
+    .failMsg("negative Kelvin!")
   )
 ```
 ```javascript
