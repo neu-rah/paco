@@ -55,7 +55,7 @@ const kchk=
 ```
 ```javascript
 #>res(">")(kchk.parse("temp: +12K"))
-Right { value: [ { temp: [ 12 ], unit: [ 'K' ] } ] }
+Right { value: [ 'temp: ', { temp: [ 12 ], unit: [ 'K' ] } ] }
 ```
 
 this, along `.verify`, `.post` and `.as` allow event callbacks and all sort of automation during the parsing, if not then let me know.

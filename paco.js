@@ -81,9 +81,11 @@ class Parser {
   static Verify=class Verify extends Parser.Post {
     get name() {return "["+this.target.expect+"]->verify!"}
     run(io) {
+      clog("verify:",io)
       const r=this.target.run(Pair([],io.snd()))
       if(isLeft(r)) return r
-      if(this.func(fromRight(r).fst())) return r.map(map(x=>io.fst().append(x)))
+      const rr=fromRight(r)
+      if(this.func(rr.fst())) return Right(Pair(io.fst().append(rr.fst()),rr.snd()))
       return this.fail(io)
     }
   }
@@ -195,6 +197,7 @@ class Parser {
     }
     get name() {return "("+this.target.expect+")->tagged as(\""+this.tag+"\")"}
     run(io) {
+      clog("To("+this.tag+") io:",io)
       const o=this.target.run(Pair([],io.snd()))
       if(o.isLeft()) return o
       const r=o.fromRight()
@@ -591,3 +594,4 @@ exports.Pair=Pair
 exports.config=config
 exports.Parser=Parser
 
+const char=is
