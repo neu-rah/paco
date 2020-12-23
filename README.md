@@ -2,12 +2,6 @@
 
 **javascript monadic parser combinators**
 
-> version 1.1 is a full re-write with focus on speed  
-also, output pair content swaped  
-`many1` replaced by `some`  
-`onFailMsg` replaced by `failMsg`  
-Parsers are no longuer functions (they are classes and do not derive from Function anymore) so they must be called with `.run` instead of direct function call.
-
 This is a tool for building parsers and parse, so that you do not have to be a parser expert to do it.
 
 ```javascript
@@ -50,13 +44,18 @@ const kchk=
     .then(digits)
     .join().as(parseInt).to("temp")
     .then(char('K').to("unit"))
-    .verify(o=>o[0].temp>=0)
-    .failMsg("negative Kelvin!")
+    .verify(o=>o[0].unit==='K'&&o[0].temp>=0)
+    .failMsg("positive Kelvin!")
   )
 ```
 ```javascript
-#>res(">")(kchk.parse("temp: +12K"))
-Right { value: [ 'temp: ', { temp: [ 12 ], unit: [ 'K' ] } ] }
+#>res(">")(kchk.parse("temp: 12K")).value 
+[ 'temp: ', { temp: 12, unit: 'K' } ]
+```
+or failing:
+```javascript
+#>res(">")(kchk.parse("temp: -12K")).value 
+'>error, expecting positive Kelvin! but found `-` here->-12K...'
 ```
 
 this, along `.verify`, `.post` and `.as` allow event callbacks and all sort of automation during the parsing, if not then let me know.
@@ -126,7 +125,8 @@ digits.excluding(oneOf("89"))//this will have no effect
 many(digit.excluding(oneOf("89")))//but this will
 ```
 
-> if optimizatumizing wuth exclusion back-track, the the first will have effect
+> if optimizatumizing with exclusion back-track, the the first will have effect  
+as PaCo will re-write the base to be exactly the second
 
 ## .as
 Parse output can be formated with `.as`, it will apply to the parser or group where inserted. `.as` will accept an output transformer function.
@@ -434,5 +434,29 @@ using:
 #>console.log(parse(">")(p)("#AN-123"))
 Right { value: [ 'AN', 123 ] }
 ```
+
+## Chronology
+
+### 1.1
+
+Using character domain analisys to detect parser overlap
+
+```text
+[0-9] ∩ ([0-9] ∪ [a-z]) 
+<=> ([0-9] ∩ [0-9]) ∪ ([0-9] ∩ [a-z]) 
+<=> ((∅)) ∪ (([0-9])) 
+<=> [0-9] ∪ ∅ 
+<=> [0-9]
+```
+
+version 1.1 is a full re-write with focus on speed  
+- output pair content swaped  
+- `many1` replaced by `some`  
+- `onFailMsg` replaced by `failMsg`  
+- Parsers are no longuer functions (they are classes and do not derive from Function anymore) so they must be called with `.run` instead of direct function call.
+
+### < 1.1
+
+some experiments with composition and parser analysis, coding was easy with no performance care.
 
 _this parser is inspired but not following "parsec"_

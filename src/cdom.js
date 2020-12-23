@@ -51,7 +51,7 @@ const CDom=(O=Nil)=>class CDom extends O {
       case None: return Just(none)
       case Any: return Just(o)
       case Union: return o.int(this)
-      default: return this.int(o).or(o.int(this)).or(Just(none))
+      default: return this.int(o).or(o.int(this))//.or(Just(none))
     }
   }
 }
@@ -196,10 +196,6 @@ class Union extends SetOp {
     const fn=this.ranges.filter(x=>x.constructor!==None)
     if(fn.length!==this.ranges.length) return Just(fn.length===0?none:fn.length===1?fn[0]:union(...fn))
 
-    //un-nest
-    if(this.ranges.find(i=>i.constructor===Union))
-      return Just(union(...this.ranges.foldr(i=>o=>o.concat(i.constructor===Union?i.ranges:[i]))([])))
-
     // simplify members
     const p=this.ranges
       .zipWith(a=>b=>Pair(a.simpl(),b))(this.ranges)
@@ -207,6 +203,10 @@ class Union extends SetOp {
     if(p.fst().length)
       return Just(union(...p.fst().map(fcomp(fromJust,fst)).append(p.snd().map(snd))))
     
+    //un-nest
+    if(this.ranges.find(i=>i.constructor===Union))
+      return Just(union(...this.ranges.foldr(i=>o=>o.concat(i.constructor===Union?i.ranges:[i]))([])))
+
     //join all
     const o=this.ranges.head()
     const oo=this.ranges.tail()
@@ -254,10 +254,6 @@ class Intersect extends SetOp {
     const fn=this.ranges.filter(x=>x.constructor!==Any)
     if(fn.length!==this.ranges.length) return Just(fn.length===0?any:fn.length===1?fn[0]:intersect(...fn))
 
-    //un-nest
-    if(this.ranges.find(i=>i.constructor===Intersect))
-      return Just(union(...this.ranges.foldr(i=>o=>o.concat(i.constructor===Union?i.ranges:[i]))([])))
-
     // simplify members
     const p=this.ranges
       .zipWith(a=>b=>Pair(a.simpl(),b))(this.ranges)
@@ -265,12 +261,17 @@ class Intersect extends SetOp {
     if(p.fst().length)
       return Just(intersect(...p.fst().map(fcomp(fromJust,fst)).append(p.snd().map(snd))))
     
+    //un-nest
+    if(this.ranges.find(i=>i.constructor===Intersect))
+      return Just(union(...this.ranges.foldr(i=>o=>o.concat(i.constructor===Union?i.ranges:[i]))([])))
+
     //join all
     const o=this.ranges.head()
     const oo=this.ranges.tail()
     for(var i=0;i<oo.length;i++) {
       const r=o._intersect(oo[i])
-      if(isJust(r)) return Just(intersect(...oo.slice(0,i),fromJust(r),...oo.slice(i+1)))
+      if(isJust(r)) 
+        return Just(intersect(...oo.slice(0,i),fromJust(r),...oo.slice(i+1)))
     }
 
     //distribute
@@ -280,7 +281,7 @@ class Intersect extends SetOp {
       if (isJust(cdi)) return cdi
     }
 
-    return Nothing()
+    return Just(none)//Nothing()
   }
 } const intersect=(...oo)=>new Intersect(...oo)
 
@@ -312,3 +313,6 @@ exports.simplify=simplify
 // const a=union(d,intersect(d))
 // const r=a.simplify()
 // clog(r.reverse().map(x=>x+"").join(" <=> "))
+
+// clog(intersect(d,union(d,union(range('a','z'),range('A','Z')))).simplify().reverse().map(o=>o+"").join(" <=> "))
+// clog(intersect(union(d,range('a','z')),d).simplify().reverse().map(o=>o+"").join(" <=> "))
