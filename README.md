@@ -248,9 +248,9 @@ _above parser could be writen using `sepBy`, we were just emphasizing the combin
 
 - **blanks** optional many white space
 
-- ~~**spaces1** one or more spaces~~
+- ~~**spaces1**~~ one or more spaces -> use `some(space)`
 
-- ~~**blanks1** one or more white spaces~~
+- ~~**blanks1**~~ one or more white spaces -> use `some(blank)`
 
 - **digits** optional many digits
 
@@ -258,7 +258,7 @@ _above parser could be writen using `sepBy`, we were just emphasizing the combin
 
 - **string("...")** match with given string
 
-- ~~**caseInsensitive("...")** non case-sensitive string match~~
+- **cis("...")** non case-sensitive string match
 
 - **regex(expr)** match with regex expression
 
@@ -439,7 +439,7 @@ Right { value: [ 'AN', 123 ] }
 
 ### 1.1
 
-Using character domain analisys to detect parser overlap
+Using character domain analysis to detect parser overlap
 
 ```text
 [0-9] ∩ ([0-9] ∪ [a-z]) 

@@ -249,6 +249,18 @@ class Is extends Sel {
 }
 const is=o=>new Is(o)
 
+class Cases extends Is {
+  get name() {return "'"+this.sel.toLowerCase()+"' or '"+this.sel.toUpperCase()+"'"}
+  same(o) {return this.sameCons(o)&&this.sel[0].toUpperCase()===o.sel[0].toUpperCase()}
+  chk(o) {return this.sel.toUpperCase()===o.toUpperCase()}
+  ranges() {
+    return cdom.union(
+      cdom.range(this.sel.toUpperCase(),this.sel.toUpperCase()),
+      cdom.range(this.sel.toLowerCase(),this.sel.toLowerCase())
+    )
+  }
+} const cases=o=>new Cases(o)
+
 class Str extends Sel {
   get name() {return this.msg||("string \""+this.sel+"\"")}
   same(o) {return this.sameCons(o)&&this.sel===o.sel}
@@ -259,8 +271,25 @@ class Str extends Sel {
       io.snd().startsWith(this.sel)?this.consume(io):this.fail(io)
     ):(foldr1(a=>b=>b._then(a,true))(this.str.split("").map(o=>is(o))).join())(io)
   }
-}
-const string=s=>new Str(s)
+} const string=s=>new Str(s)
+
+class CIStr extends Str {
+  get name() {return this.msg||("case insensitive string \""+this.sel+"\"")}
+  same(o) {return this.sameCons(o)&&this.sel.toUpperCase()===o.sel.toUpperCase()}
+  ranges() {
+    return cdom.union(
+      cdom.range(this.sel.head().toUpperCase(),this.sel.head().toUpperCase()),
+      cdom.range(this.sel.head().toLowerCase(),this.sel.head().toLowerCase())
+    )    
+  }
+  run(io) {
+    return io.snd().startsWith?(//is it a string?
+      io.snd().substr(0,this.sel.length).toUpperCase().startsWith(this.sel.toUpperCase())?
+        this.consume(io):
+        this.fail(io)
+    ):(foldr1(a=>b=>b._then(a,true))(this.str.split("").map(o=>cases(o))).join())(io)
+  }
+} const cis=s=>new CIStr(s)
 
 class Range extends CharParser {
   constructor(a,z) {
@@ -577,7 +606,7 @@ exports.blanks1=some(blank)
 exports.digits=digits
 exports.eof=eof
 exports.string=string
-// exports.caseInsensitive=caseInsensitive
+exports.cis=cis
 exports.regex=regex
 
 exports.none=none
