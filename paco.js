@@ -44,6 +44,7 @@ class Parser {
   optim() {return this}
   exclude(ex) {return this}
   ranges() {return cdom.any}
+  loop() {return false}
 
   /////////////////////////////////////////////////////////////////////////
   // modifiers
@@ -66,6 +67,7 @@ class Parser {
       this.target=this.target.exclude(ex)
       return this
     }
+    loop() {return this.target.loop()}
   }
 
   static Post=class Post extends Parser.Mod {
@@ -81,7 +83,6 @@ class Parser {
   static Verify=class Verify extends Parser.Post {
     get name() {return "["+this.target.expect+"]->verify!"}
     run(io) {
-      clog("verify:",io)
       const r=this.target.run(Pair([],io.snd()))
       if(isLeft(r)) return r
       const rr=fromRight(r)
@@ -99,11 +100,9 @@ class Parser {
       this.next=next
     }
     optim() {
-      // clog("optim",this.expect)
       this.target.optim()
       this.next.optim()
       if((!this.op)&&this.target.highOrder()&&!this.next.highOrder()) {
-        // clog("optimizing",this.expect)
         this.op=true
         if(config.backtrackExclusions) this.target=this.target.exclude(this)
       }        
@@ -134,7 +133,13 @@ class Parser {
     }
   }
   as(f) {return new Parser.As(this,f).optimize()}
-  join(sep="") {return this.as(o=>o.join(sep))}
+  static Join=class Join extends Parser.As {
+    constructor(t,sep) {
+      super(t,o=>o.join(sep))
+    }
+    loop() {return false}
+  }
+  join(sep="") {return new Parser.Join(this,sep)}
 
   static Then=class Then extends Parser.Chain {
     get name() {return this.target.expect+" then "+this.next.expect}
@@ -197,16 +202,16 @@ class Parser {
     }
     get name() {return "("+this.target.expect+")->tagged as(\""+this.tag+"\")"}
     run(io) {
-      clog("To("+this.tag+") io:",io)
       const o=this.target.run(Pair([],io.snd()))
       if(o.isLeft()) return o
       const r=o.fromRight()
-      const i=io.fst()
+      var i=io.fst()
+      const rv=!this.loop()&&r.fst().length===1?r.fst()[0]:r.fst()
       if(i.length&&typeof i.last()==="object")
-        i.last()[this.tag]=r.fst()
+        i.last()[this.tag]=rv
       else {
         const ro={}
-        ro[this.tag]=r.fst()
+        ro[this.tag]=rv
         i.push(ro)
       }
       return Right(Pair(i,r.snd()))
@@ -340,6 +345,7 @@ class Many extends Parser.Mod {
     return this
   }
   run(io) {return this.target._then(_many(this.target),true).run(io).or(Right(io))}
+  loop() {return true}
 }
 const _many=(o,m)=>new Many(o,m)
 const many=(o,m)=>_many(quickParam(o),m).optimize()
@@ -384,6 +390,7 @@ class ManyTill extends Parser.Mod {
   get name() {return "many "+this.target.expect+" until "+this.end.expect}
   highOrder() {return true}
   run(io) {return this.target._excluding(this.end)._then(_manyTill(this.target,this.end)).run(io).or(Right(io))}
+  loop() {return true}
 }
 const _manyTill=(p,e)=>new ManyTill(p,e)
 const manyTill=curry((p,e)=>_manyTill(quickParam(p),quickParam(e)).optimize())
@@ -396,6 +403,7 @@ class Count extends Parser.Mod {
   get name() {return this.cnt+" of "+this.target.expect}
   root() {return this}
   run(io) {return this.cnt ? this.target._then(_count(this.cnt-1,this.target)).run(io) : Right(io)}//TODO: use a cycle instead!
+  loop() {return true}
 }
 const _count=(n,p)=>new Count(n,p)
 const count=curry((n,p)=>_count(n,quickParam(p)).optimize())
@@ -441,6 +449,7 @@ class SepBy extends Parser.Mod {
   get name() {return this.target.expect+" separated by "+this.sep.expect}//never fails
   highOrder() {return true}
   run(io) {return this.target._then(_many(_skip(this.sep)._then(this.target))).run(io).or(Right(io))}
+  loop() {return true}
 }
 const _sepBy=(p, sep)=>new SepBy(p,sep)
 const sepBy=curry((p, sep)=>_sepBy(quickParam(p),quickParam(sep)).optimize())
@@ -448,6 +457,7 @@ const sepBy=curry((p, sep)=>_sepBy(quickParam(p),quickParam(sep)).optimize())
 class SepBy1 extends SepBy {
   get name() {return this.target.expect+" separated by "+this.sep.expect}
   run(io) {return this.target._then(_many(_skip(this.sep)._then(this.target))).run(io)}
+  loop() {return true}
 }
 const _sepBy1=(p,sep)=>new SepBy(p,sep)
 const sepBy1=curry((p,sep)=>_sepBy1(quickParam(p),quickParam(sep)).optimize())
@@ -455,8 +465,7 @@ const sepBy1=curry((p,sep)=>_sepBy1(quickParam(p),quickParam(sep)).optimize())
 class EndBy extends SepBy {
   get name() {return this.target.expect+" separated and ending with "+this.sep.expect}
   run(io) {return _sepBy(p,sep)._then(_skip(sep)).run(io).or(Right(io))}
-  get name() {return }
-  run(io) {return }
+  loop() {return true}
 }
 const _endBy=(p,sep)=>new EndBy(p,sep)
 const endBy=curry((p,sep)=>_endBy(quickParam(p),quickParam(sep)).optimize())
@@ -596,13 +605,3 @@ exports.Parser=Parser
 
 const char=is
 
-const kchk=
-  string("temp: ")
-  .then(
-    option("",oneOf("-+"))
-    .then(digits)
-    .join().as(parseInt).to("temp")
-    .then(char('K').to("unit"))
-    .verify(o=>o[0].temp>=0)
-    .failMsg("negative Kelvin!")
-  )
