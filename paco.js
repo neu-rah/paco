@@ -75,7 +75,7 @@ class Parser {
       super(o)
       this.func=f
     }
-    get name() {return "["+this.target.expect+"]->Post process"}
+    get name() {return "{"+this.target.expect+"}->Post process"}
     run(io) {return this.func(this.target.run(io))}
   }
   post(f) {return new Parser.Post(this,f).optimize()}
@@ -91,6 +91,26 @@ class Parser {
     }
   }
   verify(f,m) {return new Parser.Verify(this,f,m).optimize()}
+
+  static Optional=class Optional extends Parser.Mod {
+    get name() {return "optional("+this.target.expect+")"}
+    run(io) {
+      const r=this.target.run(Pair([],io.snd()))
+      return isRight(r)?r:Right(io)
+    }
+  }
+  optional() {return new Parser.Optional(this).optimize()}
+
+  static Else=class Else extends Parser.Mod {
+    alt;
+    constructor(target,o){super(target);this.alt=o;}
+    get name() {return this.target.expect+" else \""+this.alt+"\""}
+    run(io) {
+      const r=this.target.run(Pair([],io.snd()))
+      return isRight(r)?r:Right(Pair([this.alt],io.snd()))
+    }
+  }
+  else(o) {return new Parser.Else(this,o).optimize()}
 
   /////////////////////////////////////////////////////////////////////////
   // chains
