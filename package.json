@@ -1,11 +1,12 @@
 {
   "name": "rsite-paco",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Monadic Parser Combinators",
   "main": "paco.js",
   "scripts": {
     "repl": "devmon paco.js",
     "dev": "node --inspect dev.js",
+    "bench": "node --inspect benchm.js",
     "test": "nyc mocha test/index.spec.js"
   },
   "author": "neu-rah",

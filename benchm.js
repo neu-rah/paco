@@ -38,13 +38,21 @@ exports.runTests=runTests
 const tests=[
   Pair("string................:",Pair(string("ok"),"ok")),
   Pair("skip/join/then........:",Pair(letter.skip(digits.join()).then(letter),"a123X...")),
+  Pair("*skip/join/then.......:",Pair(letter.skip(digit.seq().join()).then(letter),"a123X...")),
   Pair("many ok...............:",Pair(many(digit),"21...")),
+  Pair("*many ok..............:",Pair(digit.seq(),"21...")),
   Pair("many empty............:",Pair(many(digit),"...")),
+  Pair("*many empty...........:",Pair(digit.seq(),"...")),
   Pair("some ok...............:",Pair(some(digit),"21...")),
+  Pair("*some ok..............:",Pair(digit.qt(1),"21...")),
   Pair("endBy.................:",Pair(endBy1(digit,space),"1 2 3 ")),
+  Pair("*endBy................:",Pair(digit.seq(space,null,1).optimize(),"1 2 3")),
   Pair("endBy join............:",Pair(endBy1(digit,space).join(),"1 2 3 ")),
+  Pair("*endBy join...........:",Pair(digit.seq(space,null,1).join().optimize(),"1 2 3")),
   Pair("digits then digit.....:",Pair(digits.join().then(digit),"123")),
+  Pair("*digits then digit....:",Pair(digit.seq().join().then(digit),"123")),
   Pair("int then digit........:",Pair(digits.join().as(parseInt).then(digit),"123")),
+  Pair("*int then digit.......:",Pair(digit.seq().join().as(parseInt).then(digit),"123")),
 ]
 
-runTests(100000,tests)
+runTests(10000,tests)

@@ -112,8 +112,7 @@ class Parser {
   }
   else(o) {return new Parser.Else(this,o).optimize()}
 
-  /////////////////////////////////////////////////////////////////////////
-  // chains
+  // chains --
   static Chain=class Chain extends Parser.Mod {
     constructor(target,next) {
       super(target)
@@ -153,10 +152,13 @@ class Parser {
     }
   }
   as(f) {return new Parser.As(this,f).optimize()}
+  static Group=class Group extends Parser.As {
+    constructor(t,sep) {super(t,o=>[o])}
+    loop() {return false}
+  }
+  group() {return new Parser.Group(this)}
   static Join=class Join extends Parser.As {
-    constructor(t,sep) {
-      super(t,o=>o.join(sep))
-    }
+    constructor(t,sep) {super(t,o=>o.join(sep))}
     loop() {return false}
   }
   join(sep="") {return new Parser.Join(this,sep)}
@@ -298,17 +300,13 @@ class Parser {
         :Left(Pair(this.min+" instances of "+this.target.name+(this.sep?" end by "+this.ends.name:""),i));
     }
   };
-  seq(sep,ends,min,max) {return new Parser.Seq(this,sep,ends,min,max).optimize();}
+  _seq(sep,ends,min,max) {return new Parser.Seq(this,sep,ends,min,max).optimize();}
+  seq(sep,ends,min,max) {return this._seq(quickParam(sep),quickParam(ends),min,max);}
+  qt(min,max) {return this.seq(null,null,min,max||min);}
 
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////////
-// parsers
-//
-/////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////////////
-
+// parsers ------------------------------------------------------------------
 class CharParser extends Parser {
   consume(io) {return Right(Pair(io.fst().append(head(io.snd())),tail(io.snd())))}
 }
@@ -634,10 +632,7 @@ const spaces=many(space).failMsg("spaces")
 const blanks=many(blank)
 const letters=many(letter)
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////
-// top level parsing and results
-
-// //interpret a result and enventually build an error message
+// top level parsing and results -------------------------------
 const res=curry((fn, r)=>{
   if (isRight(r)) return r.map(fst)
   else {
