@@ -5,7 +5,7 @@
   "main": "paco.js",
   "scripts": {
     "repl": "devmon paco.js",
-    "dev": "node --debug=11967 dev.js",
+    "dev": "node --inspect dev.js",
     "test": "nyc mocha test/index.spec.js"
   },
   "author": "neu-rah",

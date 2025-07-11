@@ -239,6 +239,65 @@ class Parser {
   }
   to(tag) {return new Parser.To(this,tag).optimize()}
 
+  static Seq=class Seq extends Parser.Mod {
+    sep;
+    ends;
+    min;
+    max;
+    constructor(item,sep,ends,min,max) {
+      super(item);
+      this.sep=sep;
+      this.ends=ends;
+      this.min=min||0;
+      this.max=max||Infinity;
+    }
+    get name() {
+      if(this.max==Infinity) switch(this.min) {
+        case 0: return "many "+this.target.name;
+        case 1: return "some "+this.target.name;
+        default: return this.min+" or more instances of "+this.target.name;
+      } else return this.min+" to "+this.max+" instances of "+this.target.name
+        +(this.sep?" separated by "+this.sep.name:"")
+        +(this.ends?" and endig with "+this.ends.expected:"");
+    }
+    run(io) {
+      var rs=[];
+      var er;
+      var sr;
+      var pr;
+      var i=io.snd();
+      var ssrc=i;
+      for(var n=0;;n++) {
+        if(this.ends) {
+          er=this.ends.run(Pair([],i))
+          if(isRight(er)) {i=fromRight(er).snd();break;}
+        }
+        if(n>=this.max) break;
+        ssrc=i;
+        if(this.sep&&rs.length) {
+          sr=this.sep.run(Pair([],i));
+          if(isLeft(sr)) return rs.length>=this.min?
+            (ends?
+              this.sep.name+" or "+this.ends.name:
+              Right(Pair(rs,i))
+            ):sr;
+          i=fromRight(sr).snd();
+        }
+        pr=this.target.run(Pair([],i));
+        if(isRight(pr)) rs=rs.concat(fromRight(pr).fst());
+        else {
+          if(this.sep) return rs.length>=this.min&&((!this.ends)||isRight(er))?
+            Right(Pair(rs,ssrc)):
+            this.target.name+(this.ends&&this.min==0?" or "+this.ends.name:"");
+          else break;
+        }
+        i=fromRight(pr).snd();
+      }
+      return rs.length>=this.min?Right(Pair(rs,i)):Left(Pair(this.min+" instances of "+this.target.name,i));
+    }
+  };
+  seq(sep,ends,min,max) {return new Parser.Seq(this,sep,ends,min,max).optimize();}
+
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -587,13 +646,14 @@ const res=curry((fn, r)=>{
       fpos += ":"+pos.join(":")+"\n"
     }
     const found=head(rr.snd())//the char to blame
-    return rr.fst().isError() ?
-    Left(fpos+"error, "+rr.fst()) :
-    Left(
-        fpos+"error, expecting "+rr.fst()
-       +" but found `"+(found || "eof")+"`"
-       +(found?" here->"+rr.snd().toString().substr(0,10)+"...":"")//TODO: this is expensive, refactor! (functional `take n`)
-      )
+    console.log("debug",rr);
+    return rr.fst().isError&&rr.fst().isError() ?
+      Left(fpos+"error, "+rr.fst()) :
+      Left(
+          fpos+"error, expecting "+rr.fst()
+        +" but found `"+(found || "eof")+"`"
+        +(found?" here->"+rr.snd().toString().substr(0,10)+"...":"")//TODO: this is expensive, refactor! (functional `take n`)
+        )
   }
 })
 
@@ -653,4 +713,3 @@ exports.config=config
 exports.Parser=Parser
 
 const char=is
-
