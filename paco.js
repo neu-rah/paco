@@ -256,14 +256,14 @@ class Parser {
         case 0: return "many "+this.target.name;
         case 1: return "some "+this.target.name;
         default: return this.min+" or more instances of "+this.target.name;
-      } else return this.min+" to "+this.max+" instances of "+this.target.name
+      } else return this.min+(this.min==this.max?"":" to "+this.max)+" instances of "+this.target.name
         +(this.sep?" separated by "+this.sep.name:"")
-        +(this.ends?" and endig with "+this.ends.expected:"");
+        +(this.ends?" and endig with "+this.ends.name:"");
     }
     run(io) {
       var rs=[];
       var er;
-      var sr;
+      // var sr;
       var pr;
       var i=io.snd();
       var ssrc=i;
@@ -275,10 +275,10 @@ class Parser {
         if(n>=this.max) break;
         ssrc=i;
         if(this.sep&&rs.length) {
-          sr=this.sep.run(Pair([],i));
+          var sr=this.sep.run(Pair([],i));
           if(isLeft(sr)) return rs.length>=this.min?
-            (ends?
-              this.sep.name+" or "+this.ends.name:
+            (this.ends?
+              Left(Pair(this.sep.name+" or "+this.ends.name,i)):
               Right(Pair(rs,i))
             ):sr;
           i=fromRight(sr).snd();
@@ -288,12 +288,14 @@ class Parser {
         else {
           if(this.sep) return rs.length>=this.min&&((!this.ends)||isRight(er))?
             Right(Pair(rs,ssrc)):
-            this.target.name+(this.ends&&this.min==0?" or "+this.ends.name:"");
+            Left(Pair(this.target.name+(this.ends&&this.min==0?" or "+this.ends.name:""),i));
           else break;
         }
         i=fromRight(pr).snd();
       }
-      return rs.length>=this.min?Right(Pair(rs,i)):Left(Pair(this.min+" instances of "+this.target.name,i));
+      return rs.length>=this.min&&((!this.ends)||isRight(er))?
+        Right(Pair(rs,i))
+        :Left(Pair(this.min+" instances of "+this.target.name+(this.sep?" end by "+this.ends.name:""),i));
     }
   };
   seq(sep,ends,min,max) {return new Parser.Seq(this,sep,ends,min,max).optimize();}
@@ -600,6 +602,7 @@ const upper=range('A','Z').failMsg("upper-case")
 const letter=match(lower,upper).failMsg("letter")
 const alphaNum=match(lower,upper,digit).failMsg("alpha-numeric")
 const space=new Is(' ').failMsg("space")
+const dot=new Is('.').failMsg("dot")
 const tab=new Is('\t').failMsg("tab")
 const nl=new Is('\n').failMsg("new-line")
 const cr=new Is('\n').failMsg("carriage return")
@@ -646,7 +649,6 @@ const res=curry((fn, r)=>{
       fpos += ":"+pos.join(":")+"\n"
     }
     const found=head(rr.snd())//the char to blame
-    console.log("debug",rr);
     return rr.fst().isError&&rr.fst().isError() ?
       Left(fpos+"error, "+rr.fst()) :
       Left(
@@ -675,6 +677,7 @@ exports.alphaNum=alphaNum
 exports.hexDigit=hexDigit
 exports.octDigit=octDigit
 exports.space=space
+exports.dot=dot
 exports.tab=tab
 exports.nl=nl
 exports.cr=cr
