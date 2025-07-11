@@ -17,8 +17,8 @@ const cdom=require("./src/cdom");
 const {clog}=require("./src/debug");
   
 var config={
-  optimize:false,//all optimizations
-  backtrackExclusions: debugging//exclude next selector root from current loop match
+  optimize:true,//all optimizations
+  backtrackExclusions: true//debugging//exclude next selector root from current loop match
 }
 
 const quickParam=p=>typeof p === "string" ? (p.length === 1 ? is(p) : string(p)) : p
