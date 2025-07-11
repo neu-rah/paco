@@ -1,6 +1,7 @@
 # PaCo
 
 **javascript monadic parser combinators**
+-----------------------------------------
 
 This is a tool for building parsers and parse, so that you do not have to be a parser expert to do it.
 
@@ -84,6 +85,8 @@ however backtrack will still respect its flag
 
 **module exported variable **
 
+__now on by default (>=1.2)__
+
 ```javascript
 var config={
   optimize:false,//all optimizations
@@ -101,8 +104,24 @@ var config={
 ## .then | .skip
 The chaining is done with `.then` or `.skip`, the first combines the output, while the second will drop it.
 
+## .else
+Provide an alternative value on parser fail, can modify any parser to have a default and do not fail.
+
+## .optional
+Make the target parser optional, silently fail.
+
 ## .or
 Parsers can alternate with `.or`
+
+## .seq(separator,terminator,min,max)
+Take the target parser and collect a sequence of it, with optional separator and/or terminator. Also checks min and max (0->Infinity by default)
+
+>`digit.seq()` => `many(digit)`
+
+>`digit.seq(null,null,1)` => `some(digit)`
+
+## .qt(min,max)
+A shortcut to .seq, to parse a specific quantity of target parser
 
 ## .notFollowedBy(p)
 
@@ -115,8 +134,6 @@ predicated `p` with no consume before parsing, if `p` fails the parsing will fai
 ## .excluding(p)
 
 predicated `p` before parsing, if `p` succeedes the parsing will fail
-
-_this could be achieved by grouping parsers instead of separate them, but some grammars are writen so_
 
 **must apply to same level parser**. using `.excluding(char(..))` at character level on a string level parser will have no effect
 
@@ -139,6 +156,9 @@ Output transformations can stack up.
 Parsers can group by nesting ex: `x.then( y.then(z).join() )`, here the `join` will only apply to the (y.z) results.
 
 TODO: this (grouping) is not fully generalized yet
+
+## .group
+Put the result inside a list (same as `as(o=>[o])`)
 
 ## .verify
 `.verify(func,msg)` function `func` will receive the parse group result (list) and should return `true` if approved or `false` to resume in error with message `msg`.
@@ -436,6 +456,16 @@ Right { value: [ 'AN', 123 ] }
 ```
 
 ## Chronology
+
+### 1.2
+
+**added:**
+- `.seq(...)` super parser
+- `.qt(min[,max])` parser modifyer (quantification), based on .seq()
+- `.group()` as o=>[o]
+- `.else()` provide alternativfe values for failing parsers (they will never fail then)
+- activated optimizations and backtrack analitics
+
 
 ### 1.1
 

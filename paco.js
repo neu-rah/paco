@@ -253,6 +253,7 @@ class Parser {
       this.min=min||0;
       this.max=max||Infinity;
     }
+    loop() {return true}
     get name() {
       if(this.max==Infinity) switch(this.min) {
         case 0: return "many "+this.target.name;
